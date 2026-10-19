@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS app_meta (
+    id BIGSERIAL PRIMARY KEY,
+    meta_key VARCHAR(100) NOT NULL UNIQUE,
+    meta_value TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+INSERT INTO app_meta (meta_key, meta_value)
+VALUES ('initialized', 'true')
+ON CONFLICT (meta_key) DO NOTHING;
