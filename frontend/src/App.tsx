@@ -4,7 +4,10 @@ function App() {
   const [health, setHealth] = useState<string>('Loading...')
 
   useEffect(() => {
-    fetch('http://localhost:8080/actuator/health')
+    //fetch('http://localhost:8080/actuator/health')
+    // Было: fetch('http://localhost:8080/actuator/health')
+    // Стало:
+    fetch('/actuator/health')
       .then(response => response.json())
       .then(data => setHealth(data.status))
       .catch(() => setHealth('ERROR: Backend is down or CORS blocked'))
