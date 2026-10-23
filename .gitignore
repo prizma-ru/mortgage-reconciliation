@@ -7,3 +7,5 @@ frontend/dist/
 infra/.env
 .env.local
 .DS_Store
+.m2repo/
+.acl-recovery/
