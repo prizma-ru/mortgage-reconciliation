@@ -1,0 +1,13 @@
+{
+  "docType": "DKP",
+  "application": {
+    "loan_amount": "4 500 000,00",
+    "interest_rate": "11",
+    "borrower_fio": "Смирнов Алексей Петрович"
+  },
+  "expected": {
+    "loan_amount": "4500000",
+    "interest_rate": "11",
+    "borrower_fio": "Смирнов Алексей Петрович"
+  }
+}

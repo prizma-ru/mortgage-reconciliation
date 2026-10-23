@@ -1,0 +1,13 @@
+{
+  "docType": "DDU",
+  "application": {
+    "loan_amount": "2 500 000",
+    "interest_rate": "9.75",
+    "borrower_fio": "сидорова-водкина анна сергеевна"
+  },
+  "expected": {
+    "loan_amount": "2500000",
+    "interest_rate": "9.75",
+    "borrower_fio": "Сидорова-Водкина Анна Сергеевна"
+  }
+}

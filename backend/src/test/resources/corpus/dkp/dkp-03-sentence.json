@@ -1,0 +1,13 @@
+{
+  "docType": "DKP",
+  "application": {
+    "loan_amount": "6750000.00",
+    "interest_rate": "8.5",
+    "borrower_fio": "Никитин Олег Владимирович"
+  },
+  "expected": {
+    "loan_amount": "6750000.00",
+    "interest_rate": "8.5",
+    "borrower_fio": "Никитин Олег Владимирович"
+  }
+}

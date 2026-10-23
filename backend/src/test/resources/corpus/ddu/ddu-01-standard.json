@@ -1,0 +1,13 @@
+{
+  "docType": "DDU",
+  "application": {
+    "loan_amount": "1 000 000,00",
+    "interest_rate": "12.50",
+    "borrower_fio": "иванов иван иванович"
+  },
+  "expected": {
+    "loan_amount": "1000000",
+    "interest_rate": "12.5",
+    "borrower_fio": "Иванов Иван Иванович"
+  }
+}

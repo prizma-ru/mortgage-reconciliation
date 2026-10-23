@@ -1,0 +1,13 @@
+{
+  "docType": "DKP",
+  "application": {
+    "loan_amount": "5000000.00",
+    "interest_rate": "10,25 %",
+    "borrower_fio": "кузнецова мария ивановна"
+  },
+  "expected": {
+    "loan_amount": "5000000.00",
+    "interest_rate": "10.25",
+    "borrower_fio": "Кузнецова Мария Ивановна"
+  }
+}
