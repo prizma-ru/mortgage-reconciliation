@@ -2,6 +2,9 @@ package com.mortgage.reconciliation.controller;
 
 import com.mortgage.reconciliation.dto.DocBlock;
 import com.mortgage.reconciliation.service.DocxReaderService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +24,7 @@ import java.util.List;
  * <p>Доступен только в профиле {@code dev}: запускать с
  * {@code --spring.profiles.active=dev} (или {@code -Dspring-boot.run.profiles=dev}).
  */
+@Tag(name = "Отладка (dev)", description = "Разбор .docx на блоки для проверки парсера; только профиль dev")
 @Profile("dev")
 @RestController
 @RequestMapping("/api/debug")
@@ -41,8 +45,15 @@ public class DebugController {
      * @param file загруженный файл
      * @return блоки документа
      */
+    @Operation(
+            summary = "Разобрать .docx на блоки",
+            description = "Возвращает параграфы и ячейки таблиц в исходном порядке — помогает "
+                    + "проверить, как парсер видит документ. Доступно только в профиле dev."
+    )
     @PostMapping(value = "/docx", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public List<DocBlock> readDocx(@RequestParam("file") MultipartFile file) {
+    public List<DocBlock> readDocx(
+            @Parameter(description = "Документ в формате .docx", required = true)
+            @RequestParam("file") MultipartFile file) {
         try (InputStream inputStream = DocxUploadSupport.requireDocxStream(file)) {
             return docxReaderService.readDocx(inputStream);
         } catch (IOException ex) {

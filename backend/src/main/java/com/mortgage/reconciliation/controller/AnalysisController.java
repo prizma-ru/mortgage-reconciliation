@@ -16,6 +16,9 @@ import com.mortgage.reconciliation.service.AnalysisPersistenceService;
 import com.mortgage.reconciliation.service.ComparatorService;
 import com.mortgage.reconciliation.service.DocxReaderService;
 import com.mortgage.reconciliation.service.RegexExtractorService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +42,7 @@ import java.util.NoSuchElementException;
  *
  * <p>Разрешён в {@code CorsConfig} для фронтенда на {@code localhost:5173} и {@code 127.0.0.1:5173}.
  */
+@Tag(name = "Анализ документов", description = "Сверка договора с заявкой и история проверок")
 @RestController
 @RequestMapping("/api/analyses")
 public class AnalysisController {
@@ -85,10 +89,20 @@ public class AnalysisController {
      * @param docType     тип документа, например {@code DDU}
      * @return сохранённый запуск с результатами по полям
      */
+    @Operation(
+            summary = "Сверить договор с заявкой",
+            description = "Разбирает .docx, извлекает поля по активному шаблону docType, нормализует "
+                    + "значения, сравнивает их с JSON-заявкой и сохраняет протокол в БД."
+    )
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public AnalysisRunResponse analyze(@RequestParam("file") MultipartFile file,
-                                       @RequestParam("application") String application,
-                                       @RequestParam("docType") String docType) {
+    public AnalysisRunResponse analyze(
+            @Parameter(description = "Договор в формате .docx", required = true)
+            @RequestParam("file") MultipartFile file,
+            @Parameter(description = "JSON-объект «код поля → значение», например "
+                    + "{\"loan_amount\":\"1 000 000,50\"}", required = true)
+            @RequestParam("application") String application,
+            @Parameter(description = "Тип документа: DDU или DKP", example = "DDU", required = true)
+            @RequestParam("docType") String docType) {
         Template template = resolveTemplate(docType);
         ApplicationData appData = parseApplication(application);
         List<DocBlock> blocks = readBlocks(file);
@@ -107,9 +121,17 @@ public class AnalysisController {
      * @param size размер страницы (не больше 100)
      * @return страница с краткой информацией о запусках
      */
+    @Operation(
+            summary = "История запусков анализа",
+            description = "Постраничный список проверок, сначала новые. Без вложенных результатов: "
+                    + "для деталей используйте GET /api/analyses/{id}."
+    )
     @GetMapping
-    public AnalysisRunPageResponse findAll(@RequestParam(name = "page", defaultValue = "0") int page,
-                                           @RequestParam(name = "size", defaultValue = "20") int size) {
+    public AnalysisRunPageResponse findAll(
+            @Parameter(description = "Номер страницы с нуля", example = "0")
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @Parameter(description = "Размер страницы, не больше 100", example = "20")
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         return AnalysisRunPageResponse.from(persistenceService.findRuns(page, size));
     }
 
@@ -119,8 +141,15 @@ public class AnalysisController {
      * @param id идентификатор запуска
      * @return запуск с результатами по полям
      */
+    @Operation(
+            summary = "Результат запуска по id",
+            description = "Возвращает сохранённый протокол сверки вместе с результатами по полям. "
+                    + "Если запуск не найден, возвращается 404."
+    )
     @GetMapping("/{id}")
-    public AnalysisRunResponse findById(@PathVariable("id") Long id) {
+    public AnalysisRunResponse findById(
+            @Parameter(description = "Идентификатор запуска", example = "1", required = true)
+            @PathVariable("id") Long id) {
         try {
             return AnalysisRunResponse.from(persistenceService.findRun(id));
         } catch (NoSuchElementException ex) {

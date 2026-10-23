@@ -1,6 +1,7 @@
 package com.mortgage.reconciliation.dto;
 
 import com.mortgage.reconciliation.domain.AnalysisRun;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -14,12 +15,13 @@ import java.util.List;
  * @param totalElements всего запусков
  * @param totalPages    всего страниц
  */
+@Schema(description = "Страница истории запусков анализа")
 public record AnalysisRunPageResponse(
-        List<AnalysisRunSummaryResponse> items,
-        int page,
-        int size,
-        long totalElements,
-        int totalPages
+        @Schema(description = "Запуски на текущей странице") List<AnalysisRunSummaryResponse> items,
+        @Schema(description = "Номер страницы с нуля", example = "0") int page,
+        @Schema(description = "Размер страницы", example = "20") int size,
+        @Schema(description = "Всего запусков", example = "42") long totalElements,
+        @Schema(description = "Всего страниц", example = "3") int totalPages
 ) {
 
     public AnalysisRunPageResponse {

@@ -1,6 +1,7 @@
 package com.mortgage.reconciliation.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * Блок документа: параграф или ячейка таблицы.
@@ -16,11 +17,16 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * @param colIndex   индекс ячейки в строке (с нуля), только для {@link BlockType#TABLE_CELL}
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(description = "Блок документа: параграф или ячейка таблицы")
 public record DocBlock(
-        BlockType type,
+        @Schema(description = "Тип блока", example = "PARAGRAPH") BlockType type,
+        @Schema(description = "Нормализованный текст блока", example = "Сумма кредита: 1 000 000 руб.")
         String text,
+        @Schema(description = "Номер таблицы в документе; только для TABLE_CELL", example = "0")
         Integer tableIndex,
+        @Schema(description = "Индекс строки таблицы; только для TABLE_CELL", example = "0")
         Integer rowIndex,
+        @Schema(description = "Индекс ячейки в строке; только для TABLE_CELL", example = "1")
         Integer colIndex
 ) {
 

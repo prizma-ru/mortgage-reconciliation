@@ -2,6 +2,7 @@ package com.mortgage.reconciliation.dto;
 
 import com.mortgage.reconciliation.domain.AnalysisFieldResult;
 import com.mortgage.reconciliation.domain.AnalysisRun;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
 import java.util.List;
@@ -16,13 +17,15 @@ import java.util.List;
  * @param createdAt когда выполнен запуск
  * @param results   результаты по полям шаблона
  */
+@Schema(description = "Сохранённый запуск сверки вместе с результатами по полям")
 public record AnalysisRunResponse(
-        Long runId,
-        String docType,
-        String fileName,
-        String status,
+        @Schema(description = "Идентификатор запуска", example = "12") Long runId,
+        @Schema(description = "Тип документа", example = "DDU") String docType,
+        @Schema(description = "Имя загруженного файла", example = "contract.docx") String fileName,
+        @Schema(description = "Общий статус запуска", example = "NEEDS_REVIEW") String status,
+        @Schema(description = "Когда выполнен запуск", example = "2026-10-23T20:09:48Z")
         Instant createdAt,
-        List<FieldResultResponse> results
+        @Schema(description = "Результаты по полям шаблона") List<FieldResultResponse> results
 ) {
 
     public AnalysisRunResponse {

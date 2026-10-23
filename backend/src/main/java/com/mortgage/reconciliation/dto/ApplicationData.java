@@ -1,5 +1,7 @@
 package com.mortgage.reconciliation.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -7,7 +9,12 @@ import java.util.Optional;
 /**
  * Данные заявки: значения полей по коду ({@code fieldCode} → сырая строка).
  */
-public record ApplicationData(Map<String, String> values) {
+@Schema(description = "Данные заявки: значения полей по коду")
+public record ApplicationData(
+        @Schema(description = "Код поля → значение из заявки",
+                example = "{\"loan_amount\": \"1 000 000,50\", \"interest_rate\": \"12,5\"}")
+        Map<String, String> values
+) {
 
     public ApplicationData {
         values = values == null ? Map.of() : Map.copyOf(values);

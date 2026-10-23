@@ -1,6 +1,7 @@
 package com.mortgage.reconciliation.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * Одна строка результата сверки: значение из заявки против значения из договора.
@@ -17,13 +18,18 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * @param message       пояснение для пользователя
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@Schema(description = "Строка протокола сверки: значение заявки против значения договора")
 public record ComparisonResult(
-        String fieldCode,
-        String title,
+        @Schema(description = "Код поля шаблона", example = "loan_amount") String fieldCode,
+        @Schema(description = "Человекочитаемое имя поля", example = "Сумма кредита") String title,
+        @Schema(description = "Нормализованное значение из заявки", example = "1000000.5")
         String appValue,
+        @Schema(description = "Нормализованное значение из договора", example = "1000000.5")
         String contractValue,
+        @Schema(description = "Где значение найдено в документе", example = "paragraph 1")
         String location,
-        ComparisonStatus status,
+        @Schema(description = "Результат сравнения", example = "OK") ComparisonStatus status,
+        @Schema(description = "Пояснение для пользователя", example = "Значения совпадают")
         String message
 ) {
 }
