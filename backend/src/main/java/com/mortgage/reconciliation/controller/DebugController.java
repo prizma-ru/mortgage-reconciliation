@@ -28,6 +28,9 @@ public class DebugController {
 
     private final DocxReaderService docxReaderService;
 
+    /**
+     * @param docxReaderService сервис разбора .docx на блоки
+     */
     public DebugController(DocxReaderService docxReaderService) {
         this.docxReaderService = docxReaderService;
     }

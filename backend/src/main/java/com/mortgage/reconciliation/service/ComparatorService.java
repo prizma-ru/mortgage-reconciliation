@@ -28,13 +28,21 @@ import java.util.Objects;
 @Service
 public class ComparatorService {
 
-    /** Порог похожести для нечёткого сравнения ФИО. */
+    /**
+     * Порог похожести для нечёткого сравнения ФИО.
+     *
+     * <p>0.85 отсекает опечатки и различия в одной букве («Иваныч»/«Иванович»), но не пропускает
+     * разные фамилии. Полное совпадение после нормализации даёт 1.0 и сюда не доходит.
+     */
     private static final double FIO_SIMILARITY_THRESHOLD = 0.85;
 
     private static final String RULE_FIO = "FIO";
 
     private final NormalizationService normalizationService;
 
+    /**
+     * @param normalizationService сервис приведения значений к каноническому виду
+     */
     public ComparatorService(NormalizationService normalizationService) {
         this.normalizationService = normalizationService;
     }
@@ -192,6 +200,8 @@ public class ComparatorService {
      * Похожесть строк: {@code 1 - расстояние Левенштейна / длина большей строки}.
      */
     private double similarity(String left, String right) {
+        // Регистр и лишние пробелы не должны влиять на вердикт: в договорах ФИО пишут
+        // и капсом, и с двойными пробелами.
         String first = left.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").strip();
         String second = right.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").strip();
 
@@ -208,6 +218,14 @@ public class ComparatorService {
         return 1.0 - (double) levenshteinDistance(first, second) / longest;
     }
 
+    /**
+     * Расстояние Левенштейна с двумя строками вместо матрицы: длины ФИО небольшие,
+     * поэтому экономия памяти важнее читаемости классической реализации.
+     *
+     * @param first  первая строка
+     * @param second вторая строка
+     * @return минимальное число вставок, удалений и замен
+     */
     private int levenshteinDistance(String first, String second) {
         int[] previous = new int[second.length() + 1];
         int[] current = new int[second.length() + 1];

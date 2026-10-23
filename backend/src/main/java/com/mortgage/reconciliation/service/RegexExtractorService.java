@@ -37,20 +37,30 @@ public class RegexExtractorService {
 
     private static final Logger log = LoggerFactory.getLogger(RegexExtractorService.class);
 
-    /** Уверенность, когда значение найдено рядом с якорной фразой. */
+    /**
+     * Уверенность, когда значение найдено рядом с якорной фразой.
+     *
+     * <p>Якорь подтверждает смысл числа («сумма кредита: 1 000 000»), поэтому такие находки
+     * считаем надёжными, но всё же не 1.0 — текст после якоря может содержать соседние суммы.
+     */
     private static final double ANCHOR_CONFIDENCE = 0.9;
 
     /** Уверенность, когда якоря нет и выражение применено ко всему блоку. */
     private static final double BLOCK_CONFIDENCE = 0.4;
 
+    /** Окно поиска: значение обычно стоит в том же или следующем предложении после якоря. */
     private static final int MAX_SENTENCES_AFTER_ANCHOR = 2;
 
+    /** Страховка от патологических блоков без точек: не даём регулярке уйти на весь абзац. */
     private static final int MAX_WINDOW_LENGTH = 400;
 
+    /** Имя группы в паттернах шаблона: {@code (?<value>...)}. */
     private static final String VALUE_GROUP = "value";
 
+    /** Граница предложения: точка/вопрос/восклицание и следующий за ними пробел. */
     private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+");
 
+    /** Разделители после якоря («:», «—», «;»), которые не относятся к значению. */
     private static final Pattern LEADING_SEPARATORS = Pattern.compile("^[\\s:;,—–-]+");
 
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");

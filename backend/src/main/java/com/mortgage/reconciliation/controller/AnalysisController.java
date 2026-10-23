@@ -55,6 +55,14 @@ public class AnalysisController {
     private final TemplateRepository templateRepository;
     private final ObjectMapper objectMapper;
 
+    /**
+     * @param docxReaderService     сервис разбора .docx на блоки
+     * @param regexExtractorService сервис извлечения значений по правилам шаблона
+     * @param comparatorService     сервис сверки значений с заявкой
+     * @param persistenceService    сервис сохранения и чтения истории запусков
+     * @param templateRepository    репозиторий шаблонов документов
+     * @param objectMapper          Jackson для разбора JSON-заявки
+     */
     public AnalysisController(DocxReaderService docxReaderService,
                               RegexExtractorService regexExtractorService,
                               ComparatorService comparatorService,

@@ -58,9 +58,13 @@ public class DocxReaderService {
         Objects.requireNonNull(inputStream, "inputStream must not be null");
 
         List<DocBlock> blocks = new ArrayList<>();
+        // Нумерация таблиц сквозная по документу: по ней сверка находит нужную таблицу,
+        // даже если между таблицами стоят параграфы.
         int tableIndex = 0;
 
         try (XWPFDocument document = new XWPFDocument(inputStream)) {
+            // Именно getBodyElements(), а не отдельные getParagraphs()/getTables(): только он
+            // сохраняет взаимный порядок параграфов и таблиц, от которого зависит поиск по якорям.
             for (IBodyElement bodyElement : document.getBodyElements()) {
                 BodyElementType elementType = bodyElement.getElementType();
 
@@ -78,6 +82,13 @@ public class DocxReaderService {
         return blocks;
     }
 
+    /**
+     * Разворачивает таблицу в плоский список блоков, сохраняя координаты ячейки.
+     *
+     * @param table      таблица документа
+     * @param tableIndex номер таблицы в документе
+     * @param blocks     список, в который добавляются блоки
+     */
     private void appendTableCells(XWPFTable table, int tableIndex, List<DocBlock> blocks) {
         List<XWPFTableRow> rows = table.getRows();
 

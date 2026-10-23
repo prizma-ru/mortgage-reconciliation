@@ -25,6 +25,9 @@ public class AnalysisPersistenceService {
 
     private final AnalysisRunRepository analysisRunRepository;
 
+    /**
+     * @param analysisRunRepository репозиторий запусков анализа
+     */
     public AnalysisPersistenceService(AnalysisRunRepository analysisRunRepository) {
         this.analysisRunRepository = analysisRunRepository;
     }
@@ -86,6 +89,8 @@ public class AnalysisPersistenceService {
     }
 
     private AnalysisRunStatus overallStatus(List<ComparisonResult> results) {
+        // DONE ставим только когда все поля совпали: любой WARN/ERROR/MANUAL/MISSING
+        // означает, что сотрудник должен открыть протокол.
         boolean allOk = results.stream()
                 .filter(Objects::nonNull)
                 .allMatch(result -> result.status() == ComparisonStatus.OK);

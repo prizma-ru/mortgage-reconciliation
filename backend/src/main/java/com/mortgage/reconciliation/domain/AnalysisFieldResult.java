@@ -68,10 +68,21 @@ public class AnalysisFieldResult {
         return id;
     }
 
+    /**
+     * Обратная ссылка на запуск, которую Hibernate восстанавливает при загрузке результата.
+     *
+     * @return запуск анализа
+     */
     public AnalysisRun getRun() {
         return run;
     }
 
+    /**
+     * Проставляет запуск; вызывается только {@link AnalysisRun#addResult(AnalysisFieldResult)},
+     * чтобы обе стороны связи оставались согласованными.
+     *
+     * @param run запуск анализа
+     */
     public void setRun(AnalysisRun run) {
         this.run = run;
     }

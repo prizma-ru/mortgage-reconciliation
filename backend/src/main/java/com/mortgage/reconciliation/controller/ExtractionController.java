@@ -36,6 +36,11 @@ public class ExtractionController {
     private final RegexExtractorService regexExtractorService;
     private final TemplateRepository templateRepository;
 
+    /**
+     * @param docxReaderService     сервис разбора .docx на блоки
+     * @param regexExtractorService сервис извлечения значений по правилам шаблона
+     * @param templateRepository    репозиторий шаблонов документов
+     */
     public ExtractionController(DocxReaderService docxReaderService,
                                 RegexExtractorService regexExtractorService,
                                 TemplateRepository templateRepository) {

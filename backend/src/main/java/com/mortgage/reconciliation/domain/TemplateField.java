@@ -56,10 +56,21 @@ public class TemplateField {
         return id;
     }
 
+    /**
+     * Родительский шаблон; Hibernate использует это свойство при загрузке поля.
+     *
+     * @return шаблон документа
+     */
     public Template getTemplate() {
         return template;
     }
 
+    /**
+     * Проставляет шаблон; вызывается только {@link Template#addField(TemplateField)},
+     * чтобы обе стороны связи оставались согласованными.
+     *
+     * @param template шаблон документа
+     */
     public void setTemplate(Template template) {
         this.template = template;
     }

@@ -21,16 +21,22 @@ import java.util.regex.Pattern;
 @Service
 public class NormalizationService {
 
+    /** Пробелы всех видов, включая неразрывные: в договорах ими разделяют разряды суммы. */
     private static final Pattern WHITESPACE = Pattern.compile("[\\s\\u00A0\\u2007\\u202F]+");
 
+    /** Обозначения рубля после суммы; удаляются до разбора числа. */
     private static final Pattern CURRENCY = Pattern.compile("(?iu)руб\\.?|рублей|рубля|₽|rub");
 
+    /** Всё, кроме цифр, разделителей и минуса: буквенные пояснения вроде «годовых». */
     private static final Pattern NOT_NUMBER = Pattern.compile("[^0-9.,-]");
 
+    /** Дата вида {@code 15.01.2025}. */
     private static final Pattern NUMERIC_DATE = Pattern.compile("(\\d{1,2})\\.(\\d{1,2})\\.(\\d{4})");
 
+    /** Дата вида {@code 15 января 2025}: день, русский месяц в родительном падеже, год. */
     private static final Pattern TEXT_DATE = Pattern.compile("(\\d{1,2})\\s+([а-яё]+)\\s+(\\d{4})", Pattern.CASE_INSENSITIVE);
 
+    /** Родительный падеж обязателен: в договорах пишут «15 января», а не «15 январь». */
     private static final Map<String, Month> RU_MONTHS = Map.ofEntries(
             Map.entry("января", Month.JANUARY),
             Map.entry("февраля", Month.FEBRUARY),

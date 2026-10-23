@@ -37,6 +37,9 @@ public class TextNormalizer {
 
         String text = raw;
 
+        // Замены идут посимвольно и до схлопывания пробелов: тексты из Word содержат
+        // «невидимые» символы (NBSP, мягкий перенос), из-за которых якорные фразы
+        // и регулярные выражения не срабатывают.
         for (char c : NBSP_LIKE) {
             text = text.replace(c, ' ');
         }
@@ -53,6 +56,7 @@ public class TextNormalizer {
             text = text.replace(c, ' ');
         }
 
+        // Многоточие раскрываем до трёх точек, чтобы сравнение строк не зависело от набора.
         text = text.replace("\u2026", "...");
         text = WHITESPACE.matcher(text).replaceAll(" ");
 
