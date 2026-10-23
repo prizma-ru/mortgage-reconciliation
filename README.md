@@ -19,6 +19,8 @@
   регистру и пробелам, `DATE` разбирается из `dd.MM.yyyy` и `dd MMMM yyyy` в `LocalDate`.
 - **Сверка с заявкой** — сравнение договора с JSON-заявкой по всем полям шаблона; каждое поле
   получает статус `OK`, `WARN`, `ERROR`, `MANUAL` или `MISSING`.
+- **История проверок** — каждый запуск сверки сохраняется в PostgreSQL (`analysis_run` и
+  `analysis_field_result`), результат доступен по `GET /api/analyses/{id}`.
 - **Отладочный эндпоинт** — отдаёт все блоки документа, чтобы проверить парсер.
 
 ## Стек
@@ -38,7 +40,7 @@
 │   ├── src/main/java/com/mortgage/reconciliation/
 │   │   ├── config/                   # CORS
 │   │   ├── controller/               # REST-эндпоинты
-│   │   ├── domain/                   # JPA-сущности Template, TemplateField
+│   │   ├── domain/                   # JPA-сущности: шаблоны и запуски анализа
 │   │   ├── dto/                      # DocBlock, ExtractedField
 │   │   ├── repository/               # Spring Data репозитории
 │   │   └── service/                  # чтение .docx, нормализация, извлечение
@@ -161,50 +163,62 @@ curl -F "file=@contract.docx" -F "docType=DDU" http://localhost:8080/api/extract
 Если одно поле встречается в документе с разными значениями, в ответе будет несколько записей
 с одинаковым `fieldCode` — такие значения предназначены для ручной проверки.
 
-### `POST /api/analyze`
+### `POST /api/analyses`
 
-Полный сценарий сверки: разбор `.docx` → извлечение полей → нормализация → сравнение с заявкой.
+Полный сценарий сверки с сохранением результата: разбор `.docx` → извлечение полей → нормализация →
+сравнение с заявкой → запись в БД.
 
-Параметры формы: `file` (`.docx`), `docType` (например `DDU`), `applicationData` — JSON-объект
+Параметры формы: `file` (`.docx`), `docType` (например `DDU`), `application` — JSON-объект
 «код поля → значение» (числа допускаются как строки и как JSON-числа).
 
 ```bash
 curl -F "file=@contract.docx" \
      -F "docType=DDU" \
-     -F 'applicationData={"loan_amount":"1 000 000,50","interest_rate":"15","borrower_fio":"иванов иван иваныч"}' \
-     http://localhost:8080/api/analyze
+     -F 'application={"loan_amount":"1 000 000,50","interest_rate":"15","borrower_fio":"иванов иван иваныч"}' \
+     http://localhost:8080/api/analyses
 ```
 
 ```json
-[
-  {
-    "fieldCode": "loan_amount",
-    "title": "Сумма кредита",
-    "appValue": "1000000.5",
-    "contractValue": "1000000.5",
-    "status": "OK",
-    "message": "Значения совпадают"
-  },
-  {
-    "fieldCode": "interest_rate",
-    "title": "Процентная ставка",
-    "appValue": "15",
-    "contractValue": "12.5",
-    "status": "ERROR",
-    "message": "Значения различаются: заявка = 15, договор = 12.5"
-  },
-  {
-    "fieldCode": "borrower_fio",
-    "title": "ФИО заемщика",
-    "appValue": "Иванов Иван Иваныч",
-    "contractValue": "Иванов Иван Иванович",
-    "status": "OK",
-    "message": "Значения совпадают (ФИО сравнено с учётом регистра и пробелов)"
-  }
-]
+{
+  "runId": 1,
+  "docType": "DDU",
+  "fileName": "contract.docx",
+  "status": "NEEDS_REVIEW",
+  "createdAt": "2026-10-23T20:09:48.303835Z",
+  "results": [
+    {
+      "fieldCode": "loan_amount",
+      "title": "Сумма кредита",
+      "appValue": "1000000.5",
+      "contractValue": "1000000.5",
+      "status": "OK",
+      "message": "Значения совпадают",
+      "location": "paragraph 1"
+    },
+    {
+      "fieldCode": "interest_rate",
+      "title": "Процентная ставка",
+      "appValue": "15",
+      "contractValue": "12.5",
+      "status": "ERROR",
+      "message": "Значения различаются: заявка = 15, договор = 12.5",
+      "location": "paragraph 2"
+    }
+  ]
+}
 ```
 
-Статусы сравнения:
+### `GET /api/analyses/{id}`
+
+Возвращает сохранённый запуск вместе с результатами по полям — та же структура, что и в ответе
+`POST /api/analyses`. Результаты читаются одним запросом с `JOIN FETCH`, поэтому
+`LazyInitializationException` не возникает.
+
+```bash
+curl http://localhost:8080/api/analyses/1
+```
+
+Статус поля (`results[].status`):
 
 | Статус | Когда выставляется |
 |---|---|
@@ -214,13 +228,15 @@ curl -F "file=@contract.docx" \
 | `MANUAL` | в договоре несколько разных значений поля или значение не нормализуется |
 | `MISSING` | поле не найдено в договоре |
 
+Общий статус запуска (`status`): `DONE`, если все поля `OK`, иначе `NEEDS_REVIEW`.
+
 Коды ответов:
 
 | Код | Причина |
 |---|---|
-| `200` | документ разобран и сверен |
-| `400` | файл пустой, не `.docx` или повреждён; не передан `docType` или `applicationData`; `applicationData` не JSON-объект |
-| `404` | для указанного `docType` нет активного шаблона |
+| `200` | документ разобран, сверен и сохранён; либо запуск найден |
+| `400` | файл пустой, не `.docx` или повреждён; не передан `docType` или `application`; `application` не JSON-объект |
+| `404` | для указанного `docType` нет активного шаблона; запуск с таким `id` не найден |
 
 ## Как работает извлечение
 
@@ -256,13 +272,18 @@ Flyway-миграции лежат в `backend/src/main/resources/db/migration`,
 |---|---|
 | `V1__init.sql` | таблица `app_meta` |
 | `V2__templates.sql` | `template`, `template_field`, тестовый шаблон `DDU` с полями `loan_amount`, `interest_rate`, `borrower_fio` |
+| `V3__analysis_results.sql` | `analysis_run`, `analysis_field_result` — история сверок |
 
 Схема:
 
 - `template` — `id`, `doc_type`, `name`, `is_active`; частичный уникальный индекс гарантирует
   один активный шаблон на `doc_type`;
 - `template_field` — `id`, `template_id` (FK, `ON DELETE CASCADE`), `field_code`, `title`,
-  `regex_pattern`, `anchor_phrases`, `normalization_rule`; уникальность `(template_id, field_code)`.
+  `regex_pattern`, `anchor_phrases`, `normalization_rule`; уникальность `(template_id, field_code)`;
+- `analysis_run` — `id`, `doc_type`, `file_name`, `status` (`DONE` / `NEEDS_REVIEW`),
+  `created_at TIMESTAMPTZ DEFAULT now()`;
+- `analysis_field_result` — `id`, `run_id` (FK, `ON DELETE CASCADE`), `field_code`, `title`,
+  `app_value`, `contract_value`, `status`, `message`, `location`.
 
 `spring.jpa.hibernate.ddl-auto=validate`: схема создаётся только миграциями, сущности обязаны ей
 соответствовать.
@@ -276,8 +297,9 @@ cd backend
 
 Покрыто: разбор `.docx` (порядок блоков, координаты ячеек), нормализация текста, regex-извлечение
 (якорь, fallback, несколько значений, дедупликация, битый regex), отладочный контроллер,
-нормализация значений (`MONEY`, `PERCENT`, `FIO`, `DATE`) и сравнение (все пять статусов,
-нечёткое сравнение ФИО, конфликт значений).
+нормализация значений (`MONEY`, `PERCENT`, `FIO`, `DATE`), сравнение (все пять статусов,
+нечёткое сравнение ФИО, конфликт значений, передача `location`) и маппинг запуска в
+`AnalysisRunResponse`.
 
 ## Соглашения
 
@@ -297,7 +319,8 @@ cd backend
 | 1 | Интеграция с Word: чтение `.docx`, DTO блоков, нормализация, отладочный эндпоинт | ✅ ЗАВЕРШЕН |
 | 2 | Реестр шаблонов в PostgreSQL и regex-экстрактор полей | ✅ ЗАВЕРШЕН |
 | 3 | Нормализация данных и компаратор: сверка договора с заявкой | ✅ ЗАВЕРШЕН |
-| 4 | Экспорт результата сверки и ручная проверка (MANUAL) в интерфейсе | ⏳ НЕ НАЧАТ |
+| 4 | REST API и сохранение результатов анализа в БД | ✅ ЗАВЕРШЕН |
+| 5 | Интерфейс: загрузка файла, таблица сверки, история проверок | ⏳ НЕ НАЧАТ |
 
 Что добавлено по этапам:
 
@@ -313,6 +336,12 @@ cd backend
   `ComparisonResult` и `ComparisonStatus`, `ComparatorService` (пять статусов, нечёткое сравнение
   ФИО через расстояние Левенштейна), `AnalysisController` (`POST /api/analyze`); новых таблиц БД
   не потребовалось — используются правила `normalization_rule` из `template_field`.
+- **Этап 4.** Миграция `V3__analysis_results.sql` с таблицами `analysis_run` и
+  `analysis_field_result`, сущности `AnalysisRun` / `AnalysisFieldResult`, репозитории
+  `AnalysisRunRepository` (с `JOIN FETCH`) и `AnalysisFieldResultRepository`,
+  `AnalysisPersistenceService`, DTO `AnalysisRunResponse` и `FieldResultResponse`;
+  `AnalysisController` переведён на `POST /api/analyses` (с сохранением в БД) и
+  `GET /api/analyses/{id}` (история). В `ComparisonResult` добавлено поле `location`.
 - **Инфраструктура репозитория.** `AGENTS.md` — системные правила для ИИ-агентов
   (Conventional Commits и обязательное обновление README).
 
@@ -321,6 +350,8 @@ cd backend
 - Извлечение основано на регулярных выражениях и якорных фразах — сторонние NLP-библиотеки
   не используются, сложные формулировки могут требовать доработки паттернов в БД.
 - Аутентификации и авторизации нет: сервис рассчитан на локальный запуск, отладочные эндпоинты открыты.
-- Фронтенд пока показывает только статус бэкенда; загрузка файла и таблица сверки — на следующем этапе.
+- Фронтенд пока показывает только статус бэкенда; загрузка файла, таблица сверки и история
+  проверок — на следующем этапе.
+- История запусков доступна только на чтение по `id`: списка `GET /api/analyses` пока нет.
 - Правила нормализации ограничены `MONEY`, `PERCENT`, `FIO`, `DATE`; остальные значения сравниваются
   как строки без учёта регистра.
