@@ -37,8 +37,10 @@
 
 ```text
 .
+├── AGENTS.md                         # правила для ИИ-агентов (коммиты, README)
 ├── backend/
 │   ├── .mvn/wrapper/                 # Maven Wrapper
+│   ├── spotbugs-exclude.xml          # исключения SAST для DI/JPA-шаблонов
 │   ├── src/main/java/com/mortgage/reconciliation/
 │   │   ├── config/                   # CORS
 │   │   ├── controller/               # REST-эндпоинты
@@ -48,11 +50,12 @@
 │   │   └── service/                  # чтение .docx, нормализация, извлечение, сравнение, сохранение
 │   ├── src/main/resources/
 │   │   ├── application.yml
-│   │   └── db/migration/             # Flyway: V1__init.sql, V2__templates.sql, V3__analysis_results.sql
+│   │   └── db/migration/             # Flyway: V1..V5
 │   └── src/test/
 │       ├── java/                     # unit- и регрессионные тесты
 │       └── resources/corpus/         # Golden Corpus: ddu/ и dkp/ (.docx + .json)
 ├── frontend/
+│   ├── eslint.config.js              # ESLint + eslint-plugin-security
 │   ├── src/
 │   │   ├── api.ts                    # запросы к бэкенду и типы ответов
 │   │   ├── components/               # UploadForm, ResultsTable
@@ -96,6 +99,13 @@ cd backend
 
 При старте Flyway применяет миграции, Hibernate проверяет соответствие сущностей схеме
 (`ddl-auto: validate`). Сервис слушает `http://localhost:8080`.
+
+Отладочные эндпоинты (`/api/debug/**`, `/api/extract/**`) отключены по умолчанию. Чтобы их включить:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+# или: java -jar target/*.jar --spring.profiles.active=dev
+```
 
 ### 3. Фронтенд
 
@@ -148,8 +158,10 @@ CORS открыт только для `http://localhost:5173` и `http://127.0.0
 ### `POST /api/debug/docx`
 
 Отладочный разбор: возвращает блоки документа в исходном порядке.
+Доступен **только в профиле `dev`** (см. «Безопасность»), иначе — `404`.
 
 ```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 curl -F "file=@contract.docx" http://localhost:8080/api/debug/docx
 ```
 
@@ -162,7 +174,8 @@ curl -F "file=@contract.docx" http://localhost:8080/api/debug/docx
 
 ### `POST /api/extract/docx`
 
-Основной сценарий: разбор файла и извлечение полей по активному шаблону указанного типа.
+Промежуточный сценарий: разбор файла и извлечение полей по активному шаблону указанного типа.
+Доступен **только в профиле `dev`**, как и `/api/debug/docx`.
 
 ```bash
 curl -F "file=@contract.docx" -F "docType=DDU" http://localhost:8080/api/extract/docx
@@ -221,6 +234,38 @@ curl -F "file=@contract.docx" \
       "location": "paragraph 2"
     }
   ]
+}
+```
+
+### `GET /api/analyses`
+
+История запусков с пагинацией, сначала новые. Возвращает краткую информацию без вложенных
+результатов — для списка в интерфейсе и навигации к `GET /api/analyses/{id}`.
+
+| Параметр | По умолчанию | Описание |
+|---|---|---|
+| `page` | `0` | номер страницы с нуля |
+| `size` | `20` | размер страницы (не больше 100) |
+
+```bash
+curl "http://localhost:8080/api/analyses?page=0&size=20"
+```
+
+```json
+{
+  "items": [
+    {
+      "runId": 4,
+      "docType": "DDU",
+      "fileName": "contract.docx",
+      "status": "DONE",
+      "createdAt": "2026-10-23T20:20:11.512Z"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1
 }
 ```
 
@@ -351,12 +396,18 @@ cd backend
 ```
 
 Тесты не требуют PostgreSQL: шаблоны для регрессионных прогонов описываются прямо в тесте,
-база не поднимается. Фронтенд проверяется типами и сборкой:
+база не поднимается. Фронтенд проверяется типами, линтером и сборкой:
 
 ```bash
 cd frontend
+npm run lint       # ESLint (typescript-eslint + eslint-plugin-security), 0 warnings
 npm run build      # tsc -b && vite build
 ```
+
+`npm run lint` проверяет `src/**/*.{ts,tsx}`: обязательные правила ESLint и typescript-eslint,
+react-hooks, а также правила безопасности из `eslint-plugin-security`
+(`detect-eval-with-expression`, `detect-non-literal-regexp`, `detect-possible-timing-attacks`
+и другие). Сборка падает при любом предупреждении (`--max-warnings=0`).
 
 ### Golden Corpus
 
@@ -430,7 +481,68 @@ corpus/
 regex-извлечение (якорь, fallback, несколько значений, дедупликация, битый regex), отладочный
 контроллер, нормализация значений (`MONEY`, `PERCENT`, `FIO`, `DATE`), сравнение (все пять
 статусов, нечёткое сравнение ФИО, конфликт значений, передача `location`), маппинг запуска в
-`AnalysisRunResponse` и весь корпус документов.
+`AnalysisRunResponse`, страница истории и весь корпус документов.
+
+## Безопасность
+
+### SBOM (CycloneDX)
+
+Бэкенд: плагин `org.cyclonedx:cyclonedx-maven-plugin` привязан к фазе `package`, поэтому SBOM
+создаётся при обычной сборке:
+
+```bash
+cd backend
+./mvnw package -DskipTests
+# → target/bom.json (CycloneDX 1.5, JSON, все runtime-зависимости)
+```
+
+Фронтенд:
+
+```bash
+cd frontend
+npm run sbom        # npm sbom --sbom-format=cyclonedx, JSON в stdout
+```
+
+`npm sbom` появился в npm 9.8. Если установлен более старый npm (например 8.x), используйте
+`npx --yes npm@11 sbom --sbom-format=cyclonedx --json` или обновите npm.
+
+### Проверка уязвимостей зависимостей (OWASP Dependency Check)
+
+```bash
+cd backend
+./mvnw dependency-check:check
+```
+
+Плагин `org.owasp:dependency-check-maven` настроен на `failBuildOnCVSS=7`: сборка падает при
+любой уязвимости с CVSS ≥ 7. Отчёты (`HTML` и `JSON`) и база NVD складываются в
+`backend/target/dependency-check-data`, поэтому каталог не засоряет домашнюю директорию.
+Плагин намеренно не привязан к `verify`, чтобы обычная сборка не зависела от загрузки NVD.
+
+### SAST (SpotBugs)
+
+```bash
+cd backend
+./mvnw spotbugs:check
+```
+
+Плагин `spotbugs-maven-plugin` запускается с `effort=Max`, `threshold=Medium` и падает при
+находках. Исключения (только ложные срабатывания фреймворк-кода) описаны в
+`backend/spotbugs-exclude.xml`: `EI_EXPOSE_REP2` для constructor injection в контроллерах и
+`EI_EXPOSE_REP*` для двусторонних JPA-связей. Реальные замечания исправлены: DTO и коллекции
+сущностей отдают неизменяемые копии (`List.copyOf`), поэтому наружу не утекает изменяемое
+состояние.
+
+### Линтер фронтенда
+
+`eslint.config.js` подключает `typescript-eslint`, `react-hooks` и `eslint-plugin-security`;
+запуск — `npm run lint` (падает при предупреждениях).
+
+### Отладочные эндпоинты
+
+`DebugController` (`POST /api/debug/docx`) и `ExtractionController` (`POST /api/extract/docx`)
+помечены `@Profile("dev")` и в обычном профиле не регистрируются — запросы получают `404`.
+Основной API (`/api/analyses`) доступен всегда; CORS по-прежнему ограничен
+`http://localhost:5173` и `http://127.0.0.1:5173`.
 
 ## Соглашения
 
@@ -453,8 +565,9 @@ regex-извлечение (якорь, fallback, несколько значе�
 | 4 | REST API и сохранение результатов анализа в БД | ✅ ЗАВЕРШЕН |
 | 5 | Интерфейс: загрузка файла и таблица сверки | ✅ ЗАВЕРШЕН |
 | 6 | Golden Corpus и регрессионное тестирование | ✅ ЗАВЕРШЕН |
+| 7 | Подготовка к безопасности (SBOM, SAST, DAST) | ✅ ЗАВЕРШЕН |
 
-Этапы 0–6 соответствуют поставленным задачам и все завершены. Следующий этап в README появится
+Этапы 0–7 соответствуют поставленным задачам и все завершены. Следующий этап в README появится
 после того, как задача будет сформулирована.
 
 Что добавлено по этапам:
@@ -487,6 +600,12 @@ regex-извлечение (якорь, fallback, несколько значе�
   «чтение → извлечение → сравнение» с проверкой Precision 100% по критическим полям;
   миграции `V4__dkp_template.sql` (шаблон DKP) и `V5__fix_fio_regex.sql` (поддержка двойной
   фамилии через дефис — баг найден корпусом).
+- **Этап 7.** Плагины `cyclonedx-maven-plugin` (SBOM `target/bom.json`), OWASP
+  `dependency-check-maven` (`failBuildOnCVSS=7`), `spotbugs-maven-plugin` и
+  `spotbugs-exclude.xml`; ESLint с `typescript-eslint` и `eslint-plugin-security`
+  (`npm run lint`), скрипт `npm run sbom`; эндпоинт `GET /api/analyses` с пагинацией;
+  отладочные контроллеры переведены на `@Profile("dev")`, а неизменяемые DTO и коллекции
+  сущностей (`List.copyOf`) устранили замечания SAST.
 - **Инфраструктура репозитория.** `AGENTS.md` — системные правила для ИИ-агентов
   (Conventional Commits и обязательное обновление README).
 
@@ -496,9 +615,11 @@ regex-извлечение (якорь, fallback, несколько значе�
   не используются, сложные формулировки могут требовать доработки паттернов в БД.
 - Суммы и ставки распознаются только в цифровой записи; суммы словами («один миллион рублей»)
   не извлекаются — в корпусе такие документы сопровождаются цифровым значением.
-- Аутентификации и авторизации нет: сервис рассчитан на локальный запуск, отладочные эндпоинты открыты.
-- История запусков доступна только по прямой ссылке `?runId=`: списка `GET /api/analyses` ещё нет.
+- Аутентификации и авторизации нет: сервис рассчитан на локальный запуск; отладочные эндпоинты
+  включаются только профилем `dev`.
 - Интерфейс не умеет ничего редактировать: значения `MANUAL` только подсвечиваются, ручная правка
   и экспорт результата пока не реализованы.
+- Интерфейс не показывает список проверок: `GET /api/analyses` уже отдаёт историю с пагинацией,
+  но экран истории в UI ещё не сделан.
 - Правила нормализации ограничены `MONEY`, `PERCENT`, `FIO`, `DATE`; остальные значения сравниваются
   как строки без учёта регистра.
