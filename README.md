@@ -518,6 +518,13 @@ cd backend
 `backend/target/dependency-check-data`, поэтому каталог не засоряет домашнюю директорию.
 Плагин намеренно не привязан к `verify`, чтобы обычная сборка не зависела от загрузки NVD.
 
+Первый запуск скачивает базу NVD (несколько сотен мегабайт). Без API-ключа NVD загрузка
+сильно ограничена по скорости — если указать ключ, проверка проходит заметно быстрее:
+
+```bash
+./mvnw dependency-check:check -Dnvd.api.key=<ключ>      # ключ: nvd.nist.gov/developers/request-an-api-key
+```
+
 ### SAST (SpotBugs)
 
 ```bash
