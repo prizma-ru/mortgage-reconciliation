@@ -35,6 +35,7 @@ class NormalizationServiceTest {
 
     @Test
     void normalizesFio() {
+        assertThat(service.normalizeFio("иванов иван")).isEqualTo("Иванов Иван");
         assertThat(service.normalizeFio("  иванов   иван   иванович ")).isEqualTo("Иванов Иван Иванович");
         assertThat(service.normalizeFio("ПЕТРОВА-ВОДКИНА АННА")).isEqualTo("Петрова-Водкина Анна");
         assertThat(service.normalizeFio("   ")).isNull();
