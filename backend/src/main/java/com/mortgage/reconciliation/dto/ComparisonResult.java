@@ -12,6 +12,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * @param title         человекочитаемое имя поля
  * @param appValue      значение из заявки
  * @param contractValue значение из договора
+ * @param location      откуда взято значение в документе
  * @param status        результат сравнения
  * @param message       пояснение для пользователя
  */
@@ -21,6 +22,7 @@ public record ComparisonResult(
         String title,
         String appValue,
         String contractValue,
+        String location,
         ComparisonStatus status,
         String message
 ) {

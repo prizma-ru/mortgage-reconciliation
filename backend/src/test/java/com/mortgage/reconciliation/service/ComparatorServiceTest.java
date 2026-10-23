@@ -35,6 +35,18 @@ class ComparatorServiceTest {
                 .containsOnly(ComparisonStatus.OK);
         assertThat(results.get(0).appValue()).isEqualTo("1000000.5");
         assertThat(results.get(0).contractValue()).isEqualTo("1000000.5");
+        assertThat(results.get(0).location()).isEqualTo("paragraph 1");
+    }
+
+    @Test
+    void keepsLocationOfMatchedTableCell() {
+        List<ComparisonResult> results = service.compare(
+                new ApplicationData(Map.of("loan_amount", "1000000")),
+                List.of(new ExtractedField("loan_amount", "1 000 000 руб.", "table 0, row 1, cell 2", 0.4)),
+                template());
+
+        assertThat(results.get(0).status()).isEqualTo(ComparisonStatus.OK);
+        assertThat(results.get(0).location()).isEqualTo("table 0, row 1, cell 2");
     }
 
     @Test

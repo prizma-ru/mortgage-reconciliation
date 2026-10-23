@@ -86,35 +86,43 @@ public class ComparatorService {
         String rule = field.getNormalizationRule();
 
         String appDisplay = normalizeDisplay(appRaw, rule);
-        List<String> distinctContractValues = distinctRawValues(contractValues);
+        List<ExtractedField> distinctValues = distinctValues(contractValues);
 
-        if (distinctContractValues.isEmpty()) {
-            return new ComparisonResult(fieldCode, title, appDisplay, null,
+        if (distinctValues.isEmpty()) {
+            return new ComparisonResult(fieldCode, title, appDisplay, null, null,
                     ComparisonStatus.MISSING, "Поле не найдено в договоре");
         }
 
-        String contractDisplay = normalizeDisplay(distinctContractValues.get(0), rule);
+        ExtractedField firstValue = distinctValues.get(0);
+        String contractDisplay = normalizeDisplay(firstValue.rawValue(), rule);
+        String location = firstValue.location();
 
         if (appRaw == null || appRaw.isBlank()) {
-            return new ComparisonResult(fieldCode, title, null, contractDisplay,
+            return new ComparisonResult(fieldCode, title, null, contractDisplay, location,
                     ComparisonStatus.WARN, "Поле есть в договоре, но отсутствует в заявке");
         }
 
-        if (distinctContractValues.size() > 1) {
-            String joined = String.join(" | ", distinctContractValues.stream()
-                    .map(value -> normalizeDisplay(value, rule))
+        if (distinctValues.size() > 1) {
+            String joinedValues = String.join(" | ", distinctValues.stream()
+                    .map(value -> normalizeDisplay(value.rawValue(), rule))
+                    .toList());
+            String joinedLocations = String.join(" | ", distinctValues.stream()
+                    .map(ExtractedField::location)
+                    .filter(Objects::nonNull)
+                    .distinct()
                     .toList());
 
-            return new ComparisonResult(fieldCode, title, appDisplay, joined,
+            return new ComparisonResult(fieldCode, title, appDisplay, joinedValues,
+                    joinedLocations.isEmpty() ? null : joinedLocations,
                     ComparisonStatus.MANUAL,
                     "В договоре найдено несколько разных значений поля — требуется ручная проверка");
         }
 
         Object appValue = normalizationService.normalize(appRaw, rule);
-        Object contractValue = normalizationService.normalize(distinctContractValues.get(0), rule);
+        Object contractValue = normalizationService.normalize(firstValue.rawValue(), rule);
 
         if (appValue == null || contractValue == null) {
-            return new ComparisonResult(fieldCode, title, appDisplay, contractDisplay,
+            return new ComparisonResult(fieldCode, title, appDisplay, contractDisplay, location,
                     ComparisonStatus.MANUAL,
                     "Не удалось нормализовать значение — требуется ручная проверка");
         }
@@ -124,26 +132,28 @@ public class ComparatorService {
                     ? "Значения совпадают (ФИО сравнено с учётом регистра и пробелов)"
                     : "Значения совпадают";
 
-            return new ComparisonResult(fieldCode, title,
-                    canonicalText(appValue), canonicalText(contractValue),
-                    ComparisonStatus.OK, message);
+            return new ComparisonResult(fieldCode, title, canonicalText(appValue),
+                    canonicalText(contractValue), location, ComparisonStatus.OK, message);
         }
 
-        return new ComparisonResult(fieldCode, title,
-                canonicalText(appValue), canonicalText(contractValue),
-                ComparisonStatus.ERROR,
+        return new ComparisonResult(fieldCode, title, canonicalText(appValue),
+                canonicalText(contractValue), location, ComparisonStatus.ERROR,
                 "Значения различаются: заявка = " + canonicalText(appValue)
                         + ", договор = " + canonicalText(contractValue));
     }
 
-    private List<String> distinctRawValues(List<ExtractedField> contractValues) {
-        return contractValues.stream()
-                .map(ExtractedField::rawValue)
-                .filter(Objects::nonNull)
-                .filter(value -> !value.isBlank())
-                .map(String::strip)
-                .distinct()
-                .toList();
+    private List<ExtractedField> distinctValues(List<ExtractedField> contractValues) {
+        Map<String, ExtractedField> unique = new LinkedHashMap<>();
+
+        for (ExtractedField value : contractValues) {
+            if (value.rawValue() == null || value.rawValue().isBlank()) {
+                continue;
+            }
+
+            unique.putIfAbsent(value.rawValue().strip(), value);
+        }
+
+        return List.copyOf(unique.values());
     }
 
     private boolean valuesMatch(String rule, Object appValue, Object contractValue) {
