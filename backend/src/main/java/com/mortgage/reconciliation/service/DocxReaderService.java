@@ -1,5 +1,6 @@
 package com.mortgage.reconciliation.service;
 
+import com.mortgage.reconciliation.dto.DocBlock;
 import org.apache.poi.xwpf.usermodel.BodyElementType;
 import org.apache.poi.xwpf.usermodel.IBodyElement;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -19,10 +20,18 @@ import java.util.Objects;
 
 /**
  * Читает .docx документ через Apache POI и возвращает плоский список блоков
- * в порядке следования в документе: параграфы и ячейки таблиц.
+ * в порядке их следования в документе: параграфы и ячейки таблиц.
+ *
+ * <p>Текст каждого блока проходит через {@link TextNormalizer}.
  */
 @Service
 public class DocxReaderService {
+
+    private final TextNormalizer textNormalizer;
+
+    public DocxReaderService(TextNormalizer textNormalizer) {
+        this.textNormalizer = textNormalizer;
+    }
 
     /**
      * Читает документ из файловой системы.
@@ -31,7 +40,7 @@ public class DocxReaderService {
      * @return блоки документа в исходном порядке
      * @throws IOException если файл недоступен или не является корректным .docx
      */
-    public List<DocxElement> readDocx(Path path) throws IOException {
+    public List<DocBlock> readDocx(Path path) throws IOException {
         Objects.requireNonNull(path, "path must not be null");
         try (InputStream inputStream = Files.newInputStream(path)) {
             return readDocx(inputStream);
@@ -45,10 +54,10 @@ public class DocxReaderService {
      * @return блоки документа в исходном порядке
      * @throws IOException если поток не удалось разобрать как .docx
      */
-    public List<DocxElement> readDocx(InputStream inputStream) throws IOException {
+    public List<DocBlock> readDocx(InputStream inputStream) throws IOException {
         Objects.requireNonNull(inputStream, "inputStream must not be null");
 
-        List<DocxElement> elements = new ArrayList<>();
+        List<DocBlock> blocks = new ArrayList<>();
         int tableIndex = 0;
 
         try (XWPFDocument document = new XWPFDocument(inputStream)) {
@@ -57,31 +66,27 @@ public class DocxReaderService {
 
                 if (elementType == BodyElementType.PARAGRAPH) {
                     XWPFParagraph paragraph = (XWPFParagraph) bodyElement;
-                    elements.add(new DocxElement.ParagraphBlock(paragraph.getText()));
+                    blocks.add(DocBlock.paragraph(textNormalizer.normalize(paragraph.getText())));
                 } else if (elementType == BodyElementType.TABLE) {
                     XWPFTable table = (XWPFTable) bodyElement;
-                    appendTableCells(table, tableIndex, elements);
+                    appendTableCells(table, tableIndex, blocks);
                     tableIndex++;
                 }
             }
         }
 
-        return elements;
+        return blocks;
     }
 
-    private void appendTableCells(XWPFTable table, int tableIndex, List<DocxElement> elements) {
+    private void appendTableCells(XWPFTable table, int tableIndex, List<DocBlock> blocks) {
         List<XWPFTableRow> rows = table.getRows();
 
         for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
             List<XWPFTableCell> cells = rows.get(rowIndex).getTableCells();
 
             for (int colIndex = 0; colIndex < cells.size(); colIndex++) {
-                elements.add(new DocxElement.TableCellBlock(
-                        tableIndex,
-                        rowIndex,
-                        colIndex,
-                        cells.get(colIndex).getText()
-                ));
+                String cellText = textNormalizer.normalize(cells.get(colIndex).getText());
+                blocks.add(DocBlock.tableCell(tableIndex, rowIndex, colIndex, cellText));
             }
         }
     }
