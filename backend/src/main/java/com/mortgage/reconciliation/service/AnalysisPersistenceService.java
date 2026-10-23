@@ -6,6 +6,8 @@ import com.mortgage.reconciliation.domain.AnalysisRunStatus;
 import com.mortgage.reconciliation.dto.ComparisonResult;
 import com.mortgage.reconciliation.dto.ComparisonStatus;
 import com.mortgage.reconciliation.repository.AnalysisRunRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,9 @@ import java.util.Objects;
  */
 @Service
 public class AnalysisPersistenceService {
+
+    /** Максимальный размер страницы истории. */
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final AnalysisRunRepository analysisRunRepository;
 
@@ -63,6 +68,21 @@ public class AnalysisPersistenceService {
 
         return analysisRunRepository.findByIdWithResults(runId)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Analysis run not found: " + runId));
+    }
+
+    /**
+     * Возвращает страницу истории запусков (сначала новые).
+     *
+     * @param page номер страницы с нуля
+     * @param size размер страницы
+     * @return страница запусков без вложенных результатов
+     */
+    @Transactional(readOnly = true)
+    public Page<AnalysisRun> findRuns(int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+
+        return analysisRunRepository.findAllByOrderByCreatedAtDescIdDesc(PageRequest.of(safePage, safeSize));
     }
 
     private AnalysisRunStatus overallStatus(List<ComparisonResult> results) {

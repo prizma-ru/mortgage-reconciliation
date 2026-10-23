@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mortgage.reconciliation.domain.AnalysisRun;
 import com.mortgage.reconciliation.domain.Template;
+import com.mortgage.reconciliation.dto.AnalysisRunPageResponse;
 import com.mortgage.reconciliation.dto.AnalysisRunResponse;
 import com.mortgage.reconciliation.dto.ApplicationData;
 import com.mortgage.reconciliation.dto.ComparisonResult;
@@ -89,6 +90,19 @@ public class AnalysisController {
         AnalysisRun run = persistenceService.save(comparison, fileNameOf(file), template.getDocType());
 
         return AnalysisRunResponse.from(run);
+    }
+
+    /**
+     * Возвращает страницу истории запусков (сначала новые).
+     *
+     * @param page номер страницы с нуля
+     * @param size размер страницы (не больше 100)
+     * @return страница с краткой информацией о запусках
+     */
+    @GetMapping
+    public AnalysisRunPageResponse findAll(@RequestParam(name = "page", defaultValue = "0") int page,
+                                           @RequestParam(name = "size", defaultValue = "20") int size) {
+        return AnalysisRunPageResponse.from(persistenceService.findRuns(page, size));
     }
 
     /**
