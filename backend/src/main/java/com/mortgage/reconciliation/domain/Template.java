@@ -83,7 +83,12 @@ public class Template {
         this.isActive = active;
     }
 
+    /**
+     * Возвращает неизменяемую копию полей: коллекция управляется только сущностью.
+     *
+     * @return поля шаблона
+     */
     public List<TemplateField> getFields() {
-        return fields;
+        return List.copyOf(fields);
     }
 }

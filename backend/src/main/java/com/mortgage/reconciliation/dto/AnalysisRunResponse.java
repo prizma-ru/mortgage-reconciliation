@@ -25,6 +25,20 @@ public record AnalysisRunResponse(
         List<FieldResultResponse> results
 ) {
 
+    public AnalysisRunResponse {
+        results = results == null ? List.of() : List.copyOf(results);
+    }
+
+    /**
+     * Возвращает неизменяемую копию списка результатов.
+     *
+     * @return результаты по полям
+     */
+    @Override
+    public List<FieldResultResponse> results() {
+        return List.copyOf(results);
+    }
+
     /**
      * Преобразует сущность запуска в DTO.
      *

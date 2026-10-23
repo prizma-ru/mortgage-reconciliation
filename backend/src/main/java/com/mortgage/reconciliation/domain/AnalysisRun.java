@@ -88,7 +88,12 @@ public class AnalysisRun {
         return createdAt;
     }
 
+    /**
+     * Возвращает неизменяемую копию результатов: коллекция управляется только сущностью.
+     *
+     * @return результаты по полям
+     */
     public List<AnalysisFieldResult> getResults() {
-        return results;
+        return List.copyOf(results);
     }
 }
