@@ -214,14 +214,27 @@ cd backend
 - **Без хардкода секретов** — только переменные окружения.
 - **Только параметризованные запросы** — JPQL с `@Param` / Spring Data, без конкатенации SQL.
 
-## Этапы
+## Прогресс разработки
 
 | Этап | Содержание | Статус |
 |---|---|---|
-| 0 | Каркас монорепозитория: Spring Boot, React + Vite, PostgreSQL в Docker | ✅ |
-| 1 | Интеграция с Word: чтение `.docx`, DTO блоков, нормализация, отладочный эндпоинт | ✅ |
-| 2 | Реестр шаблонов в PostgreSQL и regex-экстрактор полей | ✅ |
-| 3 | Сверка извлечённых значений с эталоном, ручная проверка (MANUAL), экспорт результата | ⏳ |
+| 0 | Каркас монорепозитория: Spring Boot, React + Vite, PostgreSQL в Docker | ✅ ЗАВЕРШЕН |
+| 1 | Интеграция с Word: чтение `.docx`, DTO блоков, нормализация, отладочный эндпоинт | ✅ ЗАВЕРШЕН |
+| 2 | Реестр шаблонов в PostgreSQL и regex-экстрактор полей | ✅ ЗАВЕРШЕН |
+| 3 | Сверка извлечённых значений с эталоном, ручная проверка (MANUAL), экспорт результата | ⏳ НЕ НАЧАТ |
+
+Что добавлено по этапам:
+
+- **Этап 0.** `MortgageReconciliationApplication`, `CorsConfig`, `application.yml`, страница
+  статуса бэкенда (`frontend/src/App.tsx`), `infra/docker-compose.yml`, миграция `V1__init.sql`
+  с таблицей `app_meta`.
+- **Этап 1.** `DocxReaderService`, `TextNormalizer`, `DocBlock` + `BlockType`, `DebugController`
+  (`POST /api/debug/docx`), тесты разбора и нормализации.
+- **Этап 2.** Сущности `Template` и `TemplateField`, `TemplateRepository`, `RegexExtractorService`,
+  DTO `ExtractedField`, `ExtractionController` (`POST /api/extract/docx`), миграция
+  `V2__templates.sql` с таблицами `template` и `template_field` и тестовым шаблоном `DDU`.
+- **Инфраструктура репозитория.** `AGENTS.md` — системные правила для ИИ-агентов
+  (Conventional Commits и обязательное обновление README).
 
 ## Ограничения
 
