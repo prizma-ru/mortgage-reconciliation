@@ -1,11 +1,14 @@
 package com.mortgage.reconciliation.service;
 
+import com.mortgage.reconciliation.context.HeaderContext;
 import com.mortgage.reconciliation.domain.AnalysisFieldResult;
 import com.mortgage.reconciliation.domain.AnalysisRun;
 import com.mortgage.reconciliation.domain.AnalysisRunStatus;
 import com.mortgage.reconciliation.dto.ComparisonResult;
 import com.mortgage.reconciliation.dto.ComparisonStatus;
 import com.mortgage.reconciliation.repository.AnalysisRunRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -19,6 +22,8 @@ import java.util.Objects;
  */
 @Service
 public class AnalysisPersistenceService {
+
+    private static final Logger log = LoggerFactory.getLogger(AnalysisPersistenceService.class);
 
     /** Максимальный размер страницы истории. */
     private static final int MAX_PAGE_SIZE = 100;
@@ -55,7 +60,14 @@ public class AnalysisPersistenceService {
             }
         }
 
-        return analysisRunRepository.save(run);
+        AnalysisRun saved = analysisRunRepository.save(run);
+
+        // x-call-id обязателен для сквозной трассировки: по нему лог сохранения связывается
+        // с запросом клиента и записями в других сервисах.
+        log.info("Saved analysis run {} (docType={}, file='{}', status={}), x-call-id={}",
+                saved.getId(), docType, fileName, saved.getStatus(), HeaderContext.getCallId());
+
+        return saved;
     }
 
     /**

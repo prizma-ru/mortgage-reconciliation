@@ -35,3 +35,9 @@ management:
   endpoint:
     health:
       show-details: always
+
+logging:
+  pattern:
+    # x-call-id и operation-id кладёт в MDC HeaderInterceptor — так запросы
+    # трассируются по логам без ручного копирования идентификаторов.
+    console: "%d{HH:mm:ss.SSS} %-5level [call=%X{x-call-id:-}] [op=%X{operation-id:-}] %logger{36} - %msg%n"
