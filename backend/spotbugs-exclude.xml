@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Исключения SpotBugs для шаблонов, которые не являются дефектами:
+
+  * EI_EXPOSE_REP2 в контроллерах — поля хранят внедрённые Spring-бины,
+    это стандартный constructor injection, а не утечка внутреннего состояния;
+  * EI_EXPOSE_REP / EI_EXPOSE_REP2 для двусторонних JPA-связей —
+    getRun()/setRun() и getTemplate()/setTemplate() нужны Hibernate для @ManyToOne.
+-->
+<FindBugsFilter>
+    <Match>
+        <Class name="com.mortgage.reconciliation.controller.AnalysisController"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mortgage.reconciliation.controller.DebugController"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mortgage.reconciliation.controller.ExtractionController"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mortgage.reconciliation.domain.AnalysisFieldResult"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.mortgage.reconciliation.domain.TemplateField"/>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>
