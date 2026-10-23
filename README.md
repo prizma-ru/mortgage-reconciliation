@@ -147,6 +147,18 @@ CORS открыт только для `http://localhost:5173` и `http://127.0.0
 
 ## API
 
+### Swagger UI и OpenAPI
+
+Интерактивная документация строится springdoc-openapi из аннотаций `@Tag`, `@Operation`,
+`@Parameter` и `@Schema`; метаданные сервиса заданы в `OpenApiConfig`:
+
+- Swagger UI — <http://localhost:8080/swagger-ui/index.html>
+- OpenAPI JSON — <http://localhost:8080/v3/api-docs>
+
+Отладочные эндпоинты `/api/debug/**` и `/api/extract/**` попадают в спецификацию только при
+запуске с профилем `dev`; в обычном режиме в документации видны лишь `/api/analyses` и
+`/api/analyses/{id}`.
+
 ### `GET /actuator/health`
 
 Проверка живости сервиса и подключения к БД.
