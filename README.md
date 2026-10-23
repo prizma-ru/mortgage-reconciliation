@@ -21,6 +21,8 @@
   получает статус `OK`, `WARN`, `ERROR`, `MANUAL` или `MISSING`.
 - **История проверок** — каждый запуск сверки сохраняется в PostgreSQL (`analysis_run` и
   `analysis_field_result`), результат доступен по `GET /api/analyses/{id}`.
+- **Веб-интерфейс** — загрузка `.docx` и JSON-заявки, протокол сверки в виде side-by-side таблицы
+  с подсветкой статусов и фильтром «только расхождения»; результат открывается по ссылке с `?runId=`.
 - **Отладочный эндпоинт** — отдаёт все блоки документа, чтобы проверить парсер.
 
 ## Стек
@@ -41,15 +43,20 @@
 │   │   ├── config/                   # CORS
 │   │   ├── controller/               # REST-эндпоинты
 │   │   ├── domain/                   # JPA-сущности: шаблоны и запуски анализа
-│   │   ├── dto/                      # DocBlock, ExtractedField
+│   │   ├── dto/                      # DocBlock, ExtractedField, ComparisonResult, AnalysisRunResponse
 │   │   ├── repository/               # Spring Data репозитории
-│   │   └── service/                  # чтение .docx, нормализация, извлечение
+│   │   └── service/                  # чтение .docx, нормализация, извлечение, сравнение, сохранение
 │   ├── src/main/resources/
 │   │   ├── application.yml
-│   │   └── db/migration/             # Flyway: V1__init.sql, V2__templates.sql
+│   │   └── db/migration/             # Flyway: V1__init.sql, V2__templates.sql, V3__analysis_results.sql
 │   └── src/test/java/                # unit-тесты
 ├── frontend/
-│   └── src/                          # React-страница со статусом бэкенда
+│   ├── src/
+│   │   ├── api.ts                    # запросы к бэкенду и типы ответов
+│   │   ├── components/               # UploadForm, ResultsTable
+│   │   ├── App.tsx                   # переключение «форма → результаты», runId в URL
+│   │   └── App.css, index.css        # стили
+│   └── vite.config.ts                # прокси /api и /actuator на бэкенд
 └── infra/
     ├── docker-compose.yml
     └── .env.example
@@ -96,8 +103,15 @@ npm install
 npm run dev
 ```
 
-Страница доступна на `http://localhost:5173` и показывает статус бэкенда: Vite проксирует
-`/actuator/*` на `http://localhost:8080`.
+Страница доступна на `http://localhost:5173`. Vite проксирует `/api/*` и `/actuator/*`
+на `http://localhost:8080`, поэтому CORS для локальной разработки не задействуется.
+
+Проверка production-сборки:
+
+```bash
+cd frontend
+npm run build      # tsc -b && vite build → frontend/dist
+```
 
 ## Конфигурация
 
@@ -238,6 +252,41 @@ curl http://localhost:8080/api/analyses/1
 | `400` | файл пустой, не `.docx` или повреждён; не передан `docType` или `application`; `application` не JSON-объект |
 | `404` | для указанного `docType` нет активного шаблона; запуск с таким `id` не найден |
 
+## Интерфейс
+
+Одностраничное приложение на React (без UI-библиотек, только обычный CSS).
+
+**Форма загрузки** (`frontend/src/components/UploadForm.tsx`):
+
+- выбор типа документа — `DDU` (ДДУ) или `DKP` (ДКП), значения совпадают с `docType` на бэкенде;
+- `<input type="file" accept=".docx">` для договора;
+- `<textarea>` для JSON-строки заявки (с примером по умолчанию);
+- кнопка «Проанализировать» отправляет `FormData` (`file`, `docType`, `application`)
+  на `POST /api/analyses`; на время запроса показывается «Анализ документа…», ошибки — красным
+  текстом под формой.
+
+**Протокол сверки** (`frontend/src/components/ResultsTable.tsx`):
+
+| Колонка | Содержимое |
+|---|---|
+| Поле | `title` и `fieldCode` |
+| Заявка | `appValue` |
+| Договор | `contractValue` |
+| Статус | бейдж `OK` / `WARN` / `ERROR` / `MANUAL` / `MISSING` |
+| Локация | `location` (`paragraph 2`, `table 0, row 1, cell 2`) |
+| Комментарий | `message` |
+
+Подсветка строк: `OK` — без фона, `WARN` — жёлтый, `ERROR` — красный, `MANUAL` — серый,
+`MISSING` — синий. Сверху — счётчики по статусам, общий статус запуска и чекбокс
+«Показывать только расхождения» (скрывает `OK`). Кнопка «Новый анализ» возвращает к форме.
+
+**Ссылка на результат.** После успешного анализа `runId` попадает в адрес (`/?runId=12`),
+поэтому страницу можно перезагрузить или передать коллеге: при открытии выполняется
+`GET /api/analyses/{runId}` и таблица восстанавливается из БД.
+
+Запросы вынесены в `frontend/src/api.ts` (`analyzeDocument`, `getAnalysis`, `describeError`),
+типы ответов описаны там же.
+
 ## Как работает извлечение
 
 1. Файл разбирается на блоки (`DocxReaderService`), текст нормализуется.
@@ -295,6 +344,13 @@ cd backend
 ./mvnw test
 ```
 
+Фронтенд проверяется типами и сборкой:
+
+```bash
+cd frontend
+npm run build      # tsc -b && vite build
+```
+
 Покрыто: разбор `.docx` (порядок блоков, координаты ячеек), нормализация текста, regex-извлечение
 (якорь, fallback, несколько значений, дедупликация, битый regex), отладочный контроллер,
 нормализация значений (`MONEY`, `PERCENT`, `FIO`, `DATE`), сравнение (все пять статусов,
@@ -320,12 +376,13 @@ cd backend
 | 2 | Реестр шаблонов в PostgreSQL и regex-экстрактор полей | ✅ ЗАВЕРШЕН |
 | 3 | Нормализация данных и компаратор: сверка договора с заявкой | ✅ ЗАВЕРШЕН |
 | 4 | REST API и сохранение результатов анализа в БД | ✅ ЗАВЕРШЕН |
-| 5 | Интерфейс: загрузка файла, таблица сверки, история проверок | ⏳ НЕ НАЧАТ |
+| 5 | Интерфейс: загрузка файла и таблица сверки | ✅ ЗАВЕРШЕН |
+| 6 | История проверок в интерфейсе (список запусков) и экспорт результата | ⏳ НЕ НАЧАТ |
 
 Что добавлено по этапам:
 
-- **Этап 0.** `MortgageReconciliationApplication`, `CorsConfig`, `application.yml`, страница
-  статуса бэкенда (`frontend/src/App.tsx`), `infra/docker-compose.yml`, миграция `V1__init.sql`
+- **Этап 0.** `MortgageReconciliationApplication`, `CorsConfig`, `application.yml`, стартовая
+  страница фронтенда (`frontend/src/App.tsx`), `infra/docker-compose.yml`, миграция `V1__init.sql`
   с таблицей `app_meta`.
 - **Этап 1.** `DocxReaderService`, `TextNormalizer`, `DocBlock` + `BlockType`, `DebugController`
   (`POST /api/debug/docx`), тесты разбора и нормализации.
@@ -342,6 +399,11 @@ cd backend
   `AnalysisPersistenceService`, DTO `AnalysisRunResponse` и `FieldResultResponse`;
   `AnalysisController` переведён на `POST /api/analyses` (с сохранением в БД) и
   `GET /api/analyses/{id}` (история). В `ComparisonResult` добавлено поле `location`.
+- **Этап 5.** `frontend/src/api.ts` (типы и запросы `POST /api/analyses`, `GET /api/analyses/{id}`),
+  компоненты `UploadForm` и `ResultsTable`, переключение экранов и `?runId=` в `App.tsx`,
+  стили `App.css` / `index.css`, прокси `/api` в `vite.config.ts`; подсветка статусов
+  (`OK`/`WARN`/`ERROR`/`MANUAL`/`MISSING`), фильтр «только расхождения», индикатор загрузки
+  и вывод ошибок.
 - **Инфраструктура репозитория.** `AGENTS.md` — системные правила для ИИ-агентов
   (Conventional Commits и обязательное обновление README).
 
@@ -350,8 +412,8 @@ cd backend
 - Извлечение основано на регулярных выражениях и якорных фразах — сторонние NLP-библиотеки
   не используются, сложные формулировки могут требовать доработки паттернов в БД.
 - Аутентификации и авторизации нет: сервис рассчитан на локальный запуск, отладочные эндпоинты открыты.
-- Фронтенд пока показывает только статус бэкенда; загрузка файла, таблица сверки и история
-  проверок — на следующем этапе.
-- История запусков доступна только на чтение по `id`: списка `GET /api/analyses` пока нет.
+- История запусков доступна только по прямой ссылке `?runId=`: списка `GET /api/analyses` ещё нет.
+- Интерфейс не умеет ничего редактировать: значения `MANUAL` только подсвечиваются, ручная правка
+  и экспорт появятся на следующем этапе.
 - Правила нормализации ограничены `MONEY`, `PERCENT`, `FIO`, `DATE`; остальные значения сравниваются
   как строки без учёта регистра.
