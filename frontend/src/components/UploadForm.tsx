@@ -3,21 +3,31 @@ import type { FormEvent } from 'react'
 import { analyzeDocument, describeError } from '../api'
 import type { AnalysisRunResponse } from '../api'
 
+/** Типы документов, для которых в БД есть активный шаблон (DDU и DKP). */
 const DOC_TYPES = [
   { value: 'DDU', label: 'ДДУ — договор долевого участия' },
   { value: 'DKP', label: 'ДКП — договор купли-продажи' },
 ]
 
+/** Пример заявки: демонстрирует формат «код поля → значение», а не конкретный договор. */
 const SAMPLE_APPLICATION = `{
   "loan_amount": "1 000 000,50",
   "interest_rate": "12,5",
   "borrower_fio": "Иванов Иван Иванович"
 }`
 
+/** Пропсы формы: результат передаётся наверх, чтобы App переключил экран. */
 interface UploadFormProps {
+  /** Вызывается после успешного анализа; получает сохранённый запуск. */
   onAnalyzed: (run: AnalysisRunResponse) => void
 }
 
+/**
+ * Форма загрузки договора и заявки.
+ *
+ * <p>Состояние: выбранный тип документа, файл, текст заявки, флаг запроса и текст ошибки.
+ * Ошибки показываются под формой, а не через alert — так они не блокируют ввод.
+ */
 export function UploadForm({ onAnalyzed }: UploadFormProps) {
   const [docType, setDocType] = useState('DDU')
   const [file, setFile] = useState<File | null>(null)
@@ -25,6 +35,12 @@ export function UploadForm({ onAnalyzed }: UploadFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  /**
+   * Проверяет ввод и отправляет документ на сверку.
+   *
+   * <p>JSON валидируется до запроса: иначе бэкенд вернул бы 400 уже после загрузки файла,
+   * а пользователь ждал бы впустую.
+   */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 

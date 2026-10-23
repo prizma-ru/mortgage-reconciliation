@@ -1,7 +1,18 @@
+/**
+ * Типы и запросы к REST API бэкенда.
+ *
+ * <p>Базовый URL не задаётся: в dev-режиме запросы уходят на относительные пути `/api/...`
+ * и проксируются Vite на `http://localhost:8080` (см. `vite.config.ts`). Так же работает
+ * прод-сборка за reverse-proxy, поэтому CORS не задействуется.
+ */
+
+/** Статус сравнения одного поля — совпадает с enum бэкенда. */
 export type ComparisonStatus = 'OK' | 'WARN' | 'ERROR' | 'MANUAL' | 'MISSING'
 
+/** Общий статус запуска: DONE — все поля совпали, NEEDS_REVIEW — нужен человек. */
 export type RunStatus = 'DONE' | 'NEEDS_REVIEW'
 
+/** Результат сверки по одному полю шаблона. */
 export interface FieldResultResponse {
   fieldCode: string
   title: string
@@ -12,6 +23,7 @@ export interface FieldResultResponse {
   location: string | null
 }
 
+/** Сохранённый запуск анализа вместе с результатами по полям. */
 export interface AnalysisRunResponse {
   runId: number
   docType: string
@@ -32,6 +44,12 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Выполняет запрос и приводит ошибку бэкенда к {@link ApiError}.
+ *
+ * <p>Spring отдаёт ошибки в разных форматах (`message`, `error`, `detail`), поэтому тело
+ * разбирается мягко: пользователю важнее текст причины, чем строгая схема.
+ */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init)
 

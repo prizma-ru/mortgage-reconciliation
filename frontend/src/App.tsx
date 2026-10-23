@@ -5,10 +5,17 @@ import { ResultsTable } from './components/ResultsTable'
 import { describeError, getAnalysis } from './api'
 import type { AnalysisRunResponse } from './api'
 
+/** Читает идентификатор запуска из адреса: ссылку `?runId=12` можно сохранить и переслать. */
 function readRunIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get('runId')
 }
 
+/**
+ * Синхронизирует адрес с текущим экраном.
+ *
+ * <p>Используется `replaceState`, а не переход по history: перезагрузка страницы не должна
+ * требовать «назад», достаточно, чтобы ссылка открывала тот же протокол.
+ */
 function writeRunIdToUrl(runId: number | null) {
   const url = new URL(window.location.href)
 
@@ -21,11 +28,24 @@ function writeRunIdToUrl(runId: number | null) {
   window.history.replaceState(null, '', url)
 }
 
+/**
+ * Корневой компонент: переключает экран формы и протокола сверки.
+ *
+ * <p>Состояние: загруженный запуск (или null), флаг загрузки сохранённого анализа и текст ошибки.
+ */
 function App() {
   const [run, setRun] = useState<AnalysisRunResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  /**
+   * Восстанавливает протокол из БД при открытии ссылки с `?runId=`.
+   *
+   * <p>Зависимостей нет намеренно: адрес читается один раз при монтировании, а дальнейшие
+   * переходы выполняются обработчиками без повторного запроса. Флаг `cancelled` защищает от
+   * обновления состояния, если компонент размонтируется до ответа (StrictMode в dev
+   * монтирует эффект дважды).
+   */
   useEffect(() => {
     const runId = readRunIdFromUrl()
 
@@ -58,12 +78,14 @@ function App() {
     }
   }, [])
 
+  /** Показывает свежий протокол и закрепляет его в адресе, чтобы ссылку можно было переслать. */
   const handleAnalyzed = useCallback((data: AnalysisRunResponse) => {
     setRun(data)
     setError(null)
     writeRunIdToUrl(data.runId)
   }, [])
 
+  /** Возврат к форме: сбрасывает протокол и убирает `runId` из адреса. */
   const handleReset = useCallback(() => {
     setRun(null)
     setError(null)

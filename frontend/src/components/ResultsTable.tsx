@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { AnalysisRunResponse, ComparisonStatus, FieldResultResponse } from '../api'
 
+/** Подписи статусов в таблице (совпадают с enum бэкенда). */
 const STATUS_LABELS: Record<ComparisonStatus, string> = {
   OK: 'OK',
   WARN: 'WARN',
@@ -9,6 +10,7 @@ const STATUS_LABELS: Record<ComparisonStatus, string> = {
   MISSING: 'MISSING',
 }
 
+/** Пояснения к статусам — во всплывающей подсказке у бейджа. */
 const STATUS_HINTS: Record<ComparisonStatus, string> = {
   OK: 'Значения совпадают',
   WARN: 'Поле есть в договоре, но отсутствует в заявке',
@@ -17,27 +19,40 @@ const STATUS_HINTS: Record<ComparisonStatus, string> = {
   MISSING: 'Данные не найдены в договоре',
 }
 
+/** Всё, кроме OK, считается расхождением для фильтра и счётчика «требуют внимания». */
 const DISCREPANCY_STATUSES: ComparisonStatus[] = ['WARN', 'ERROR', 'MANUAL', 'MISSING']
 
+/** Пропсы таблицы: данные запуска и возврат к форме. */
 interface ResultsTableProps {
+  /** Сохранённый запуск с результатами по полям. */
   run: AnalysisRunResponse
+  /** Сбрасывает текущий анализ и возвращает форму загрузки. */
   onReset: () => void
 }
 
+/** Пустое значение показываем прочерком, чтобы ячейка не выглядела «сломанной». */
 function displayValue(value: string | null): string {
   return value === null || value === '' ? '—' : value
 }
 
+/** Форматирует ISO-дату в локальное время; при неожиданном формате оставляет строку как есть. */
 function formatDate(createdAt: string): string {
   const date = new Date(createdAt)
 
   return Number.isNaN(date.getTime()) ? createdAt : date.toLocaleString('ru-RU')
 }
 
+/** Класс строки задаёт цвет подсветки статуса (см. App.css). */
 function rowClassName(result: FieldResultResponse): string {
   return `results__row results__row--${result.status.toLowerCase()}`
 }
 
+/**
+ * Таблица протокола сверки «заявка ↔ договор».
+ *
+ * <p>Состояние: включён ли фильтр «только расхождения». Счётчики и отфильтрованные строки
+ * пересчитываются через useMemo, чтобы не перебирать результаты на каждый рендер.
+ */
 export function ResultsTable({ run, onReset }: ResultsTableProps) {
   const [onlyDiscrepancies, setOnlyDiscrepancies] = useState(false)
 
