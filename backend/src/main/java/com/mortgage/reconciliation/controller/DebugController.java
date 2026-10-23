@@ -2,6 +2,7 @@ package com.mortgage.reconciliation.controller;
 
 import com.mortgage.reconciliation.dto.DocBlock;
 import com.mortgage.reconciliation.service.DocxReaderService;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,9 +18,10 @@ import java.util.List;
 /**
  * Отладочный эндпоинт для проверки парсера .docx.
  *
- * <p>Разрешён в {@code CorsConfig} (правило {@code /**}) для фронтенда
- * на {@code http://localhost:5173} и {@code http://127.0.0.1:5173}.
+ * <p>Доступен только в профиле {@code dev}: запускать с
+ * {@code --spring.profiles.active=dev} (или {@code -Dspring-boot.run.profiles=dev}).
  */
+@Profile("dev")
 @RestController
 @RequestMapping("/api/debug")
 public class DebugController {

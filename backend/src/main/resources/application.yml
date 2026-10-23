@@ -1,3 +1,5 @@
+# Отладочные эндпоинты /api/debug/** и /api/extract/** доступны только в профиле dev:
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 server:
   port: ${SERVER_PORT:8080}
 

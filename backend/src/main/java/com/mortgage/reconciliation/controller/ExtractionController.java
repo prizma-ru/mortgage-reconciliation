@@ -6,6 +6,7 @@ import com.mortgage.reconciliation.dto.ExtractedField;
 import com.mortgage.reconciliation.repository.TemplateRepository;
 import com.mortgage.reconciliation.service.DocxReaderService;
 import com.mortgage.reconciliation.service.RegexExtractorService;
+import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,8 +25,9 @@ import java.util.Locale;
  * Извлечение полей из .docx по активному шаблону типа документа.
  *
  * <p>Конвейер: {@link DocxReaderService} → {@link RegexExtractorService}.
- * Разрешён в {@code CorsConfig} для фронтенда на {@code localhost:5173} и {@code 127.0.0.1:5173}.
+ * Эндпоинт отладочный и доступен только в профиле {@code dev}.
  */
+@Profile("dev")
 @RestController
 @RequestMapping("/api/extract")
 public class ExtractionController {
