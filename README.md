@@ -159,6 +159,48 @@ CORS открыт только для `http://localhost:5173` и `http://127.0.0
 запуске с профилем `dev`; в обычном режиме в документации видны лишь `/api/analyses` и
 `/api/analyses/{id}`.
 
+### Заголовки
+
+Все запросы к API проходят через `HeaderInterceptor`, который складывает сквозные заголовки
+в `HeaderContext` (ThreadLocal) и в MDC логов.
+
+| Заголовок | Обязателен | Назначение |
+|---|---|---|
+| `Operation-Id` | да | мнемоника операции, например `ANALYZE_CONTRACT` или `GET_ANALYSES` |
+| `x-call-id` | да | сквозной идентификатор запроса (UUID v7); если не передан — сервис генерирует новый |
+| `x-mdm-id` | нет | идентификатор клиента |
+| `x-user-session-id` | нет | идентификатор сессии пользователя |
+| `X-Segment-Key` | нет | ключ маршрутизации, например номер заявки |
+
+Обязательные заголовки проверяются на уровне контроллеров: без них запрос получает `400`.
+Опциональные можно не передавать — сервис обработает запрос с доступными данными.
+
+```bash
+curl -X POST http://localhost:8080/api/analyses \
+  -H "Operation-Id: ANALYZE_CONTRACT" \
+  -H "x-call-id: 0192f0e0-0000-7000-8000-00000000beef" \
+  -H "x-mdm-id: mdm-1" \
+  -H "X-Segment-Key: APP-2024-77" \
+  -F "docType=DDU" \
+  -F 'application={"loan_amount":"1 000 000,50"}' \
+  -F "file=@contract.docx"
+
+curl "http://localhost:8080/api/analyses?page=0&size=20" \
+  -H "Operation-Id: GET_ANALYSES" \
+  -H "x-call-id: 0192f0e0-0000-7000-8000-00000000cafe"
+```
+
+Что происходит с заголовками дальше:
+
+- `HeaderContext.getCallId()` используется в логах (см. `AnalysisPersistenceService`), а шаблон
+  логов печатает `[call=…] [op=…]` из MDC;
+- `HeaderPropagationUtils.collectHeaders()` / `.apply(HttpHeaders)` передают те же заголовки
+  в исходящие запросы к внешним сервисам;
+- `Authorization`, `Cookie` и `device-fingerprint` в контекст не попадают и не логируются.
+
+В Swagger UI заголовки описаны через `@Parameter(in = ParameterIn.HEADER)` и видны у каждого
+метода как обязательные или опциональные поля.
+
 ### `GET /actuator/health`
 
 Проверка живости сервиса и подключения к БД.
@@ -584,6 +626,10 @@ cd backend
   `RequestContextHolder`) для логов и передачи дальше; отсутствие опционального заголовка не
   отклоняет запрос; `Authorization`, `Cookie`, `device-fingerprint` в логи не пишутся.
   Устаревший `Client Session Header` запрещён. Полный стандарт — в `AGENTS.md`, раздел 5.
+  **Реализация:** `HeaderContext` + `HeaderInterceptor` (MDC `x-call-id`/`operation-id`),
+  `HeaderPropagationUtils` для исходящих вызовов, `@Parameter(in = ParameterIn.HEADER)`
+  в Swagger; обязательность заголовков закреплена в контроллерах через
+  `@RequestHeader(required = true)`.
 
 ## Прогресс разработки
 
