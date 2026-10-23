@@ -8,11 +8,13 @@ import com.mortgage.reconciliation.service.DocxReaderService;
 import com.mortgage.reconciliation.service.RegexExtractorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -70,7 +72,22 @@ public class ExtractionController {
             @Parameter(description = "Договор в формате .docx", required = true)
             @RequestParam("file") MultipartFile file,
             @Parameter(description = "Тип документа: DDU или DKP", example = "DDU", required = true)
-            @RequestParam("docType") String docType) {
+            @RequestParam("docType") String docType,
+            @Parameter(in = ParameterIn.HEADER, name = "Operation-Id", required = true,
+                    description = "Идентификатор операции, например EXTRACT_DOCX")
+            @RequestHeader(name = "Operation-Id", required = true) String operationId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-call-id", required = true,
+                    description = "Сквозной идентификатор запроса (UUID v7)")
+            @RequestHeader(name = "x-call-id", required = true) String callId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-mdm-id",
+                    description = "Идентификатор клиента (опционально)")
+            @RequestHeader(name = "x-mdm-id", required = false) String mdmId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-user-session-id",
+                    description = "Идентификатор сессии пользователя (опционально)")
+            @RequestHeader(name = "x-user-session-id", required = false) String userSessionId,
+            @Parameter(in = ParameterIn.HEADER, name = "X-Segment-Key",
+                    description = "Ключ маршрутизации, например номер заявки (опционально)")
+            @RequestHeader(name = "X-Segment-Key", required = false) String segmentKey) {
         if (docType == null || docType.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "docType is required");
         }

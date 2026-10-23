@@ -18,12 +18,14 @@ import com.mortgage.reconciliation.service.DocxReaderService;
 import com.mortgage.reconciliation.service.RegexExtractorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -102,7 +104,22 @@ public class AnalysisController {
                     + "{\"loan_amount\":\"1 000 000,50\"}", required = true)
             @RequestParam("application") String application,
             @Parameter(description = "Тип документа: DDU или DKP", example = "DDU", required = true)
-            @RequestParam("docType") String docType) {
+            @RequestParam("docType") String docType,
+            @Parameter(in = ParameterIn.HEADER, name = "Operation-Id", required = true,
+                    description = "Идентификатор операции, например ANALYZE_CONTRACT")
+            @RequestHeader(name = "Operation-Id", required = true) String operationId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-call-id", required = true,
+                    description = "Сквозной идентификатор запроса (UUID v7)")
+            @RequestHeader(name = "x-call-id", required = true) String callId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-mdm-id",
+                    description = "Идентификатор клиента (опционально)")
+            @RequestHeader(name = "x-mdm-id", required = false) String mdmId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-user-session-id",
+                    description = "Идентификатор сессии пользователя (опционально)")
+            @RequestHeader(name = "x-user-session-id", required = false) String userSessionId,
+            @Parameter(in = ParameterIn.HEADER, name = "X-Segment-Key",
+                    description = "Ключ маршрутизации, например номер заявки (опционально)")
+            @RequestHeader(name = "X-Segment-Key", required = false) String segmentKey) {
         Template template = resolveTemplate(docType);
         ApplicationData appData = parseApplication(application);
         List<DocBlock> blocks = readBlocks(file);
@@ -131,7 +148,22 @@ public class AnalysisController {
             @Parameter(description = "Номер страницы с нуля", example = "0")
             @RequestParam(name = "page", defaultValue = "0") int page,
             @Parameter(description = "Размер страницы, не больше 100", example = "20")
-            @RequestParam(name = "size", defaultValue = "20") int size) {
+            @RequestParam(name = "size", defaultValue = "20") int size,
+            @Parameter(in = ParameterIn.HEADER, name = "Operation-Id", required = true,
+                    description = "Идентификатор операции, например GET_ANALYSES")
+            @RequestHeader(name = "Operation-Id", required = true) String operationId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-call-id", required = true,
+                    description = "Сквозной идентификатор запроса (UUID v7)")
+            @RequestHeader(name = "x-call-id", required = true) String callId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-mdm-id",
+                    description = "Идентификатор клиента (опционально)")
+            @RequestHeader(name = "x-mdm-id", required = false) String mdmId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-user-session-id",
+                    description = "Идентификатор сессии пользователя (опционально)")
+            @RequestHeader(name = "x-user-session-id", required = false) String userSessionId,
+            @Parameter(in = ParameterIn.HEADER, name = "X-Segment-Key",
+                    description = "Ключ маршрутизации, например номер заявки (опционально)")
+            @RequestHeader(name = "X-Segment-Key", required = false) String segmentKey) {
         return AnalysisRunPageResponse.from(persistenceService.findRuns(page, size));
     }
 
@@ -149,7 +181,22 @@ public class AnalysisController {
     @GetMapping("/{id}")
     public AnalysisRunResponse findById(
             @Parameter(description = "Идентификатор запуска", example = "1", required = true)
-            @PathVariable("id") Long id) {
+            @PathVariable("id") Long id,
+            @Parameter(in = ParameterIn.HEADER, name = "Operation-Id", required = true,
+                    description = "Идентификатор операции, например GET_ANALYSIS")
+            @RequestHeader(name = "Operation-Id", required = true) String operationId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-call-id", required = true,
+                    description = "Сквозной идентификатор запроса (UUID v7)")
+            @RequestHeader(name = "x-call-id", required = true) String callId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-mdm-id",
+                    description = "Идентификатор клиента (опционально)")
+            @RequestHeader(name = "x-mdm-id", required = false) String mdmId,
+            @Parameter(in = ParameterIn.HEADER, name = "x-user-session-id",
+                    description = "Идентификатор сессии пользователя (опционально)")
+            @RequestHeader(name = "x-user-session-id", required = false) String userSessionId,
+            @Parameter(in = ParameterIn.HEADER, name = "X-Segment-Key",
+                    description = "Ключ маршрутизации, например номер заявки (опционально)")
+            @RequestHeader(name = "X-Segment-Key", required = false) String segmentKey) {
         try {
             return AnalysisRunResponse.from(persistenceService.findRun(id));
         } catch (NoSuchElementException ex) {
