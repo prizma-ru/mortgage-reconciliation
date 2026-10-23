@@ -75,6 +75,31 @@ function extractMessage(body: string): string | null {
 }
 
 /**
+ * Собирает сквозные заголовки корпоративного стандарта.
+ *
+ * <p>`Operation-Id` и `x-call-id` обязательны на бэкенде, остальные заголовки передаёт
+ * шлюз — браузер их не знает. UUID v7 генерируется на сервере, если заголовок не пришёл;
+ * здесь достаточно уникального значения на запрос.
+ *
+ * @param operationId мнемоника операции, например ANALYZE_DOCUMENT
+ */
+function buildTraceHeaders(operationId: string): Record<string, string> {
+  return {
+    'Operation-Id': operationId,
+    'x-call-id': createCallId(),
+  }
+}
+
+/** Генерирует идентификатор запроса; при отсутствии crypto.randomUUID — запасной вариант. */
+function createCallId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  return `web-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+/**
  * Отправляет документ и заявку на сверку.
  *
  * @param file загруженный .docx
@@ -93,13 +118,16 @@ export async function analyzeDocument(
 
   return request<AnalysisRunResponse>('/api/analyses', {
     method: 'POST',
+    headers: buildTraceHeaders('ANALYZE_DOCUMENT'),
     body: formData,
   })
 }
 
 /** Загружает сохранённый запуск анализа по его идентификатору. */
 export async function getAnalysis(runId: string | number): Promise<AnalysisRunResponse> {
-  return request<AnalysisRunResponse>(`/api/analyses/${runId}`)
+  return request<AnalysisRunResponse>(`/api/analyses/${runId}`, {
+    headers: buildTraceHeaders('GET_ANALYSIS'),
+  })
 }
 
 /** Приводит ошибку любого вида к понятному для пользователя тексту. */
