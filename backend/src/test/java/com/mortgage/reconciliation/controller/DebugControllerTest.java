@@ -31,7 +31,7 @@ class DebugControllerTest {
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 buildDocx());
 
-        List<DocBlock> blocks = controller.readDocx(file);
+        List<DocBlock> blocks = controller.readDocx(file, "DEBUG_DOCX", "call-1", null, null, null);
 
         assertThat(blocks).hasSize(3);
         assertThat(blocks.get(0).type()).isEqualTo(BlockType.PARAGRAPH);
@@ -50,7 +50,7 @@ class DebugControllerTest {
     void serializesBlocksWithTypeAndWithoutNullCoordinates() throws Exception {
         MockMultipartFile file = new MockMultipartFile("file", "contract.docx", null, buildDocx());
 
-        String json = objectMapper.writeValueAsString(controller.readDocx(file));
+        String json = objectMapper.writeValueAsString(controller.readDocx(file, "DEBUG_DOCX", "call-1", null, null, null));
 
         assertThat(json).contains("\"type\":\"PARAGRAPH\"");
         assertThat(json).contains("\"type\":\"TABLE_CELL\"");
@@ -62,7 +62,7 @@ class DebugControllerTest {
     void rejectsNonDocxFile() {
         MockMultipartFile file = new MockMultipartFile("file", "contract.pdf", "application/pdf", "no".getBytes());
 
-        assertThatThrownBy(() -> controller.readDocx(file))
+        assertThatThrownBy(() -> controller.readDocx(file, "DEBUG_DOCX", "call-1", null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.BAD_REQUEST));
@@ -72,7 +72,7 @@ class DebugControllerTest {
     void rejectsEmptyFile() {
         MockMultipartFile file = new MockMultipartFile("file", "empty.docx", null, new byte[0]);
 
-        assertThatThrownBy(() -> controller.readDocx(file))
+        assertThatThrownBy(() -> controller.readDocx(file, "DEBUG_DOCX", "call-1", null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.BAD_REQUEST));
