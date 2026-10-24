@@ -1,8 +1,5 @@
 package com.mortgage.reconciliation.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mortgage.reconciliation.domain.AnalysisRun;
 import com.mortgage.reconciliation.domain.Template;
 import com.mortgage.reconciliation.dto.AnalysisRunPageResponse;
@@ -11,8 +8,10 @@ import com.mortgage.reconciliation.dto.ApplicationData;
 import com.mortgage.reconciliation.dto.ComparisonResult;
 import com.mortgage.reconciliation.dto.DocBlock;
 import com.mortgage.reconciliation.dto.ExtractedField;
+import com.mortgage.reconciliation.exception.ApplicationParsingException;
 import com.mortgage.reconciliation.repository.TemplateRepository;
 import com.mortgage.reconciliation.service.AnalysisPersistenceService;
+import com.mortgage.reconciliation.service.ApplicationParserService;
 import com.mortgage.reconciliation.service.ComparatorService;
 import com.mortgage.reconciliation.service.DocxReaderService;
 import com.mortgage.reconciliation.service.RegexExtractorService;
@@ -36,7 +35,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.NoSuchElementException;
 
 /**
@@ -49,9 +47,6 @@ import java.util.NoSuchElementException;
 @RequestMapping("/api/analyses")
 public class AnalysisController {
 
-    private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
-    };
-
     private static final int MAX_FILE_NAME_LENGTH = 255;
 
     private final DocxReaderService docxReaderService;
@@ -59,28 +54,28 @@ public class AnalysisController {
     private final ComparatorService comparatorService;
     private final AnalysisPersistenceService persistenceService;
     private final TemplateRepository templateRepository;
-    private final ObjectMapper objectMapper;
+    private final ApplicationParserService applicationParserService;
 
     /**
-     * @param docxReaderService     сервис разбора .docx на блоки
-     * @param regexExtractorService сервис извлечения значений по правилам шаблона
-     * @param comparatorService     сервис сверки значений с заявкой
-     * @param persistenceService    сервис сохранения и чтения истории запусков
-     * @param templateRepository    репозиторий шаблонов документов
-     * @param objectMapper          Jackson для разбора JSON-заявки
+     * @param docxReaderService      сервис разбора .docx на блоки
+     * @param regexExtractorService  сервис извлечения значений по правилам шаблона
+     * @param comparatorService      сервис сверки значений с заявкой
+     * @param persistenceService     сервис сохранения и чтения истории запусков
+     * @param templateRepository     репозиторий шаблонов документов
+     * @param applicationParserService сервис разбора вложенной JSON-заявки АЗС
      */
     public AnalysisController(DocxReaderService docxReaderService,
                               RegexExtractorService regexExtractorService,
                               ComparatorService comparatorService,
                               AnalysisPersistenceService persistenceService,
                               TemplateRepository templateRepository,
-                              ObjectMapper objectMapper) {
+                              ApplicationParserService applicationParserService) {
         this.docxReaderService = docxReaderService;
         this.regexExtractorService = regexExtractorService;
         this.comparatorService = comparatorService;
         this.persistenceService = persistenceService;
         this.templateRepository = templateRepository;
-        this.objectMapper = objectMapper;
+        this.applicationParserService = applicationParserService;
     }
 
     /**
@@ -121,7 +116,14 @@ public class AnalysisController {
                     description = "Ключ маршрутизации, например номер заявки (опционально)")
             @RequestHeader(name = "X-Segment-Key", required = false) String segmentKey) {
         Template template = resolveTemplate(docType);
-        ApplicationData appData = parseApplication(application);
+        ApplicationData appData;
+
+        try {
+            appData = new ApplicationData(applicationParserService.parseToFlatMap(application));
+        } catch (ApplicationParsingException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        }
+
         List<DocBlock> blocks = readBlocks(file);
         List<ExtractedField> extracted = regexExtractorService.extract(blocks, template);
         List<ComparisonResult> comparison = comparatorService.compare(appData, extracted, template);
@@ -214,20 +216,6 @@ public class AnalysisController {
         return templateRepository.findActiveByDocType(normalized)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "No active template for docType: " + normalized));
-    }
-
-    private ApplicationData parseApplication(String application) {
-        if (application == null || application.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "application is required");
-        }
-
-        try {
-            Map<String, Object> raw = objectMapper.readValue(application, JSON_OBJECT);
-            return ApplicationData.fromJson(raw);
-        } catch (JsonProcessingException ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "application must be a JSON object: " + ex.getOriginalMessage(), ex);
-        }
     }
 
     private List<DocBlock> readBlocks(MultipartFile file) {
