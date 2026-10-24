@@ -19,6 +19,10 @@
   регистру и пробелам, `DATE` разбирается из `dd.MM.yyyy` и `dd MMMM yyyy` в `LocalDate`.
 - **Сверка с заявкой** — сравнение договора с JSON-заявкой по всем полям шаблона; каждое поле
   получает статус `OK`, `WARN`, `ERROR`, `MANUAL` или `MISSING`.
+- **Разбор заявки АЗС** — вложенный JSON (`SystemID → Request → CreditApplication →
+  PersonalApplicants[]/Pledges[]`) десериализуется в DTO, а затем «сплющивается» в карту путей
+  вида `Request.CreditApplication.PersonalApplicants[0].Surname`. Плоский legacy-формат
+  (`{"loan_amount": "…"}`) по-прежнему поддерживается.
 - **История проверок** — каждый запуск сверки сохраняется в PostgreSQL (`analysis_run` и
   `analysis_field_result`), результат доступен по `GET /api/analyses/{id}`.
 - **Веб-интерфейс** — загрузка `.docx` и JSON-заявки, протокол сверки в виде side-by-side таблицы
@@ -200,6 +204,64 @@ curl "http://localhost:8080/api/analyses?page=0&size=20" \
 
 В Swagger UI заголовки описаны через `@Parameter(in = ParameterIn.HEADER)` и видны у каждого
 метода как обязательные или опциональные поля.
+
+### Формат заявки
+
+Параметр `application` в `POST /api/analyses` принимает либо вложенный JSON АЗС, либо старый
+плоский объект.
+
+Вложенная заявка (по документу «Список атрибутов заявки на ипотеку»):
+
+```json
+{
+  "SystemID": "ASZ",
+  "RequestID": "0f1e2d3c-4b5a-6978-8a9b-0c1d2e3f4a5b",
+  "UserID": "ivanov",
+  "Request": {
+    "CreditApplicationId": "1234567890123456789",
+    "Version": 3,
+    "CreditApplication": {
+      "RequestedLoanAmount": 5000000.00,
+      "RequestedLoanTerm": 240,
+      "InitialPayment": 1000000.00,
+      "PledgeRate": 0.12,
+      "CreateChannel": "cm.ChannelKind.SalePoint",
+      "PersonalApplicants": [
+        {"Role": "cm.CustomerLoanApplicationRole.Borrower", "Surname": "Иванов",
+         "Name": "Иван", "Patronymic": "Иванович", "BirthDay": "1990-05-15", "INN": "770123456789"}
+      ],
+      "Pledges": [
+        {"ObjectCategory": "cm.RealEstateCategory.Readyhousing", "Area": 54.5,
+         "ValueOfSaleDocument": 6000000.00}
+      ]
+    }
+  }
+}
+```
+
+`ApplicationParserService` десериализует документ в DTO (`MortgageApplicationDto` → `RequestDto`
+→ `CreditApplicationDto` → `PersonalApplicantsDto` / `PledgesDto`), неизвестные атрибуты
+игнорируются. `ApplicationFlattenerService` превращает DTO в карту:
+
+| JSON | Ключ после сплющивания |
+|---|---|
+| `SystemID` | `SystemID` |
+| `Request.CreditApplication.RequestedLoanAmount` | `Request.CreditApplication.RequestedLoanAmount` |
+| `PersonalApplicants[0].Surname` | `Request.CreditApplication.PersonalApplicants[0].Surname` |
+| `Pledges[0].Area` | `Request.CreditApplication.Pledges[0].Area` |
+
+Числа приводятся к обычной десятичной записи, даты — к ISO (`yyyy-MM-dd`), `null`-поля
+пропускаются. Битый JSON возвращает `400` с сообщением из `ApplicationParsingException`.
+
+Старый формат остаётся рабочим и не требует изменений в UI:
+
+```json
+{"loan_amount": "1 000 000,50", "interest_rate": "12,5", "borrower_fio": "Иванов Иван Иванович"}
+```
+
+> Коды полей шаблона (`loan_amount`, `interest_rate`) пока не связаны с путями атрибутов АЗС,
+> поэтому для вложенной заявки сверка вернёт `WARN`/`MISSING`. Сопоставление «поле шаблона →
+> путь атрибута заявки» — следующий шаг.
 
 ### `GET /actuator/health`
 
@@ -535,7 +597,9 @@ corpus/
 regex-извлечение (якорь, fallback, несколько значений, дедупликация, битый regex), отладочный
 контроллер, нормализация значений (`MONEY`, `PERCENT`, `FIO`, `DATE`), сравнение (все пять
 статусов, нечёткое сравнение ФИО, конфликт значений, передача `location`), маппинг запуска в
-`AnalysisRunResponse`, страница истории и весь корпус документов.
+`AnalysisRunResponse`, страница истории, разбор и сплющивание вложенной заявки АЗС
+(`ApplicationParserTest`: вложенные пути, индексы массивов, ISO-даты, битый JSON, legacy-формат)
+и весь корпус документов.
 
 ## Безопасность
 
@@ -648,6 +712,14 @@ cd backend
 после того, как задача будет сформулирована. Сквозные требования (стандарт комментирования,
 линтер, проверки безопасности) не выделены в отдельный этап и описаны выше — в разделах
 «Безопасность», «Тестирование» и «Соглашения».
+
+Вне этапов добавлены:
+
+- **сквозные заголовки** — `HeaderContext`, `HeaderInterceptor`, `HeaderPropagationUtils`
+  (раздел «Заголовки»);
+- **разбор вложенной заявки АЗС** — `ApplicationParserService`, `ApplicationFlattenerService`,
+  DTO `MortgageApplicationDto`/`RequestDto`/`CreditApplicationDto`/`PersonalApplicantsDto`/
+  `PledgesDto` и `ApplicationParsingException` (раздел «Формат заявки»).
 
 Что добавлено по этапам:
 
